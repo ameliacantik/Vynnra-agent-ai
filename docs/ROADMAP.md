@@ -22,16 +22,17 @@
 - [x] Agent state model
 - [x] Permission/capability gate foundation
 - [x] CI build validation workflow
+- [x] Debug APK build verified by GitHub Actions
 
 ## Phase 2 — Vynnra UI/UX
 - [ ] Production chat experience
-- [ ] Sidebar and chat sessions
-- [ ] Thinking level selector: Low / Medium / High / Max
-- [ ] High-level activity animation/status cards
-- [ ] Permission Center UI
-- [ ] Settings
+- [x] Sidebar and chat sessions UI foundation
+- [x] Thinking level selector: Low / Medium / High / Max
+- [x] High-level activity/status UI foundation
+- [x] Permission Center UI foundation
+- [x] Settings UI foundation
 - [ ] Tool/action journal UI
-- [ ] Vynnra branding, logo, splash, empty states
+- [ ] Vynnra branding, logo, splash, empty states refinement
 - [ ] Error/reconnect UX
 
 ## Phase 3 — Agent Orchestrator
