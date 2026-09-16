@@ -17,15 +17,19 @@ A serious, modular Android AI agent project focused on personal assistance, devi
 ## Roadmap
 
 - Phase 0 — Architecture specification
-- Phase 1 — Android foundation, UI, state, data, provider/tool contracts
-- Phase 2 — Agent orchestrator
-- Phase 3 — Accessibility and screen control
-- Phase 4 — Vision engine
-- Phase 5 — Browser and file agent
-- Phase 6 — Web research
-- Phase 7 — Memory and task persistence
-- Phase 8 — Voice
-- Phase 9 — Background agent
-- Phase 10 — Power-user/device administration capabilities
+- Phase 1 — Foundation
+- Phase 2 — Vynnra UI/UX
+- Phase 3 — Agent Orchestrator
+- Phase 4 — Permission Center
+- Phase 5 — Android Control
+- Phase 6 — Vision
+- Phase 7 — Browser + Files
+- Phase 8 — Tavily Web Search
+- Phase 9 — Memory + Tasks
+- Phase 10 — Voice
+- Phase 11 — Background Agent
+- Phase 12 — Power User / Device Owner / ADB
 
-See `docs/ARCHITECTURE.md` for the current design.
+`Vynnra Agent 1.0` is the milestone after Phase 12.
+
+See `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` for the detailed design.
