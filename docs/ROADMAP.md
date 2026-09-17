@@ -41,7 +41,10 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [x] Orchestrator
 - [x] Tool registry
 - [x] Planner/executor loop
+- [x] Provider-backed AI planner with capability-aware tool selection
 - [x] Observe → Understand → Plan → Act → Verify → Recover → Respond
+- [x] Production chat/voice routed through the AgentOrchestrator
+- [x] Verified tool outputs fed back into the final AI response
 - [x] Verification engine
 - [x] Recovery engine
 - [x] Action journal
