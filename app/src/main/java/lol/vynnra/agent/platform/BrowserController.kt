@@ -6,13 +6,12 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import android.provider.Settings
-import android.view.accessibility.AccessibilityNodeInfo
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /**
  * Chrome-focused controller built on Android intents plus the existing Accessibility service.
- * It never assumes a Chrome-specific DOM API is available.
+ * UI actions are gated on Chrome being the current foreground package.
  */
 class BrowserController(context: Context) {
     private val appContext = context.applicationContext
@@ -45,28 +44,42 @@ class BrowserController(context: Context) {
         return openUrl("https://www.google.com/search?q=$encoded")
     }
 
-    fun back(): BrowserActionResult =
-        VynnraAccessibilityService.current()?.globalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK)
+    fun back(): BrowserActionResult {
+        if (!isChromeForeground()) return chromeUnavailable()
+        return VynnraAccessibilityService.current()?.globalAction(
+            android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_BACK
+        )?.let { BrowserActionResult(it.success, it.message) }
+            ?: BrowserActionResult(false, "Accessibility service is unavailable")
+    }
+
+    fun clickText(text: String): BrowserActionResult {
+        if (!isChromeForeground()) return chromeUnavailable()
+        return VynnraAccessibilityService.current()?.clickText(text)
             ?.let { BrowserActionResult(it.success, it.message) }
             ?: BrowserActionResult(false, "Accessibility service is unavailable")
+    }
 
-    fun clickText(text: String): BrowserActionResult =
-        VynnraAccessibilityService.current()?.clickText(text)
+    fun typeText(text: String): BrowserActionResult {
+        if (!isChromeForeground()) return chromeUnavailable()
+        return VynnraAccessibilityService.current()?.typeText(text)
             ?.let { BrowserActionResult(it.success, it.message) }
             ?: BrowserActionResult(false, "Accessibility service is unavailable")
+    }
 
-    fun typeText(text: String): BrowserActionResult =
-        VynnraAccessibilityService.current()?.typeText(text)
-            ?.let { BrowserActionResult(it.success, it.message) }
-            ?: BrowserActionResult(false, "Accessibility service is unavailable")
+    fun scrollDown(): BrowserActionResult {
+        if (!isChromeForeground()) return chromeUnavailable()
+        return dispatchScroll(0.78f, 0.42f, 0.78f, 0.18f)
+    }
 
-    fun scrollDown(): BrowserActionResult = dispatchScroll(0.78f, 0.42f, 0.78f, 0.18f)
-
-    fun scrollUp(): BrowserActionResult = dispatchScroll(0.42f, 0.20f, 0.42f, 0.76f)
+    fun scrollUp(): BrowserActionResult {
+        if (!isChromeForeground()) return chromeUnavailable()
+        return dispatchScroll(0.42f, 0.20f, 0.42f, 0.76f)
+    }
 
     fun currentPage(): BrowserPageSnapshot? {
         val service = VynnraAccessibilityService.current() ?: return null
         val snapshot = service.inspectScreen(maxNodes = 500) ?: return null
+        if (snapshot.packageName != CHROME_PACKAGE) return null
         return BrowserPageSnapshot(
             packageName = snapshot.packageName,
             capturedAtEpochMs = snapshot.capturedAtEpochMs,
@@ -126,6 +139,12 @@ class BrowserController(context: Context) {
             BrowserActionResult(false, "Unable to open accessibility settings: ${error.message ?: "unknown error"}")
         }
     }
+
+    private fun isChromeForeground(): Boolean =
+        VynnraAccessibilityService.current()?.inspectScreen(maxNodes = 1)?.packageName == CHROME_PACKAGE
+
+    private fun chromeUnavailable(): BrowserActionResult =
+        BrowserActionResult(false, "Chrome is not the current foreground app")
 
     private fun dispatchScroll(startX: Float, startY: Float, endX: Float, endY: Float): BrowserActionResult {
         val controller = AndroidController(appContext)
