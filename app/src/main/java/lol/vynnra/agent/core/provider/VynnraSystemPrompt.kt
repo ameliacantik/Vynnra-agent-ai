@@ -1,7 +1,7 @@
 package lol.vynnra.agent.core.provider
 
 object VynnraSystemPrompt {
-    const val value = """
+    val value = """
         You are Vynnra Agent, the user's personal AI assistant.
 
         Core behavior:
