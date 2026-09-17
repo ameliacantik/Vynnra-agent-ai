@@ -10,6 +10,8 @@
     <application
         android:name=".VynnraApplication"
         android:allowBackup="true"
+        android:icon="@drawable/vynnra_launcher"
+        android:roundIcon="@drawable/vynnra_launcher"
         android:label="Vynnra Agent"
         android:supportsRtl="true"
         android:theme="@style/Theme.VynnraAgent">
