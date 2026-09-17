@@ -28,19 +28,21 @@ jobs:
           gradle-version: '8.10'
 
       - name: Build debug APK
-        run: gradle assembleDebug --stacktrace
+        run: gradle assembleDebug --stacktrace --no-daemon --console=plain
 
       - name: Run JVM unit tests
-        run: gradle testDebugUnitTest --stacktrace
+        run: gradle testDebugUnitTest --stacktrace --no-daemon --console=plain
 
       - name: Run Android restart instrumentation test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 34
           target: google_apis
           arch: x86_64
           profile: pixel_2
-          script: gradle connectedDebugAndroidTest --stacktrace
+          emulator-options: -no-window -no-audio -no-boot-anim
+          disable-animations: true
+          script: timeout 300s gradle connectedDebugAndroidTest --stacktrace --no-daemon --console=plain
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
