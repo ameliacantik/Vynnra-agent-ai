@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +32,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,7 +53,6 @@ import lol.vynnra.agent.core.task.TaskRecord
 import lol.vynnra.agent.core.task.TaskStepRecord
 import lol.vynnra.agent.data.memory.MemoryRepository
 import lol.vynnra.agent.data.task.TaskRepository
-import lol.vynnra.agent.ui.theme.VynnraBlack
 import lol.vynnra.agent.ui.theme.VynnraMuted
 import lol.vynnra.agent.ui.theme.VynnraPanel
 import lol.vynnra.agent.ui.theme.VynnraPanelElevated
@@ -161,7 +160,6 @@ fun Phase9Center(
     selectedTaskId?.let { taskId ->
         TaskDetailDialog(
             task = tasks.firstOrNull { it.id == taskId },
-            steps = remember(taskId, tasks) { null },
             repository = taskRepository,
             onDismiss = { selectedTaskId = null }
         )
@@ -216,14 +214,12 @@ private fun TaskCard(task: TaskRecord, selected: Boolean, onClick: () -> Unit) {
 @Composable
 private fun TaskDetailDialog(
     task: TaskRecord?,
-    steps: List<TaskStepRecord>?,
     repository: TaskRepository,
     onDismiss: () -> Unit
 ) {
     var loadedSteps by remember(task?.id) { mutableStateOf<List<TaskStepRecord>>(emptyList()) }
-    val scope = rememberCoroutineScope()
-    androidx.compose.runtime.LaunchedEffect(task?.id) {
-        if (task != null) loadedSteps = repository.getSteps(task.id)
+    LaunchedEffect(task?.id) {
+        loadedSteps = if (task == null) emptyList() else repository.getSteps(task.id)
     }
 
     if (task == null) return
@@ -234,12 +230,14 @@ private fun TaskDetailDialog(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(task.goal)
                 Text("Status: ${task.status.name}")
+                Text("Checkpoint: ${task.checkpointJson ?: "none"}", color = VynnraMuted)
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(loadedSteps) { step ->
                         Surface(color = VynnraPanelElevated, shape = RoundedCornerShape(12.dp)) {
                             Column(Modifier.padding(10.dp)) {
                                 Text("${step.stepIndex + 1}. ${step.title}", color = VynnraText)
                                 Text(step.status.name, color = VynnraPurple)
+                                Text("Attempts: ${step.attempts}", color = VynnraMuted)
                                 step.outputSummary?.let { Text(it, color = VynnraMuted) }
                                 step.errorMessage?.let { Text(it, color = VynnraMuted) }
                             }
