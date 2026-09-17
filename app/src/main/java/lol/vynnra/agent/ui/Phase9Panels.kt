@@ -66,11 +66,12 @@ fun Phase9Center(
     onClose: () -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val memories by memoryRepository.observeEnabled().collectAsStateWithLifecycle(emptyList())
+    val memories by memoryRepository.observeAll().collectAsStateWithLifecycle(emptyList())
     val tasks by taskRepository.observeTasks().collectAsStateWithLifecycle(emptyList())
     var tab by remember { mutableIntStateOf(0) }
     var selectedTaskId by remember { mutableStateOf<String?>(null) }
     var addMemoryOpen by remember { mutableStateOf(false) }
+    var deleteMemoryId by remember { mutableStateOf<String?>(null) }
 
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.72f)), contentAlignment = Alignment.Center) {
         Surface(
@@ -96,12 +97,13 @@ fun Phase9Center(
                 Spacer(Modifier.height(10.dp))
 
                 if (tab == 0) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Text("${memories.count { it.enabled }} enabled / ${memories.size} total", color = VynnraMuted)
                         Button(onClick = { addMemoryOpen = true }) { Text("Add memory") }
                     }
                     Spacer(Modifier.height(8.dp))
                     if (memories.isEmpty()) {
-                        EmptyPhase9("No enabled memories yet.")
+                        EmptyPhase9("No saved memories yet.")
                     } else {
                         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(memories, key = { it.id }) { memory ->
@@ -109,7 +111,7 @@ fun Phase9Center(
                                     memory = memory,
                                     onEnabled = { enabled -> scope.launch { memoryRepository.setEnabled(memory.id, enabled) } },
                                     onPinned = { pinned -> scope.launch { memoryRepository.setPinned(memory.id, pinned) } },
-                                    onDelete = { scope.launch { memoryRepository.delete(memory.id) } }
+                                    onDelete = { deleteMemoryId = memory.id }
                                 )
                             }
                         }
@@ -157,6 +159,22 @@ fun Phase9Center(
         )
     }
 
+    deleteMemoryId?.let { id ->
+        val memory = memories.firstOrNull { it.id == id }
+        AlertDialog(
+            onDismissRequest = { deleteMemoryId = null },
+            title = { Text("Forget memory?") },
+            text = { Text(memory?.content ?: "This saved memory will be permanently removed.") },
+            confirmButton = {
+                Button(onClick = {
+                    scope.launch { memoryRepository.delete(id) }
+                    deleteMemoryId = null
+                }) { Text("Forget") }
+            },
+            dismissButton = { Button(onClick = { deleteMemoryId = null }) { Text("Cancel") } }
+        )
+    }
+
     selectedTaskId?.let { taskId ->
         TaskDetailDialog(
             task = tasks.firstOrNull { it.id == taskId },
@@ -179,12 +197,13 @@ private fun MemoryCard(
                 Column(Modifier.weight(1f)) {
                     Text(memory.key ?: memory.kind.name, color = VynnraText, fontWeight = FontWeight.SemiBold)
                     Text(memory.content, color = VynnraMuted)
+                    if (!memory.enabled) Text("Disabled — not used for agent context", color = VynnraMuted)
                 }
                 IconButton(onClick = { onPinned(!memory.pinned) }) {
                     Icon(Icons.Outlined.PushPin, contentDescription = "Pin", tint = if (memory.pinned) VynnraPurple else VynnraMuted)
                 }
                 IconButton(onClick = onDelete) {
-                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "Delete", tint = VynnraMuted)
+                    Icon(Icons.Outlined.DeleteOutline, contentDescription = "Forget", tint = VynnraMuted)
                 }
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
