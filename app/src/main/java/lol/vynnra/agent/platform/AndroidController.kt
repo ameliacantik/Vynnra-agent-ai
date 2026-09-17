@@ -54,8 +54,8 @@ class AndroidController(private val context: Context) {
 
     fun clickText(text: String): AndroidControlResult = serviceOrBlocked { it.clickText(text) }
 
-    fun findText(text: String): List<UiElementInfo> =
-        VynnraAccessibilityService.current()?.findText(text).orEmpty()
+    fun findText(text: String, ignoreCase: Boolean = true): List<UiElementInfo> =
+        VynnraAccessibilityService.current()?.findText(text, ignoreCase).orEmpty()
 
     private fun serviceOrBlocked(
         action: (VynnraAccessibilityService) -> AndroidControlResult
