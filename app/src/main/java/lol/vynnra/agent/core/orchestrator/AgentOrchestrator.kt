@@ -54,9 +54,10 @@ class AgentOrchestrator(
             taskRepository?.checkpoint(task, null)
 
             if (plan.actions.isEmpty()) {
-                update(runId, AgentStatus.COMPLETED, "No executable actions were produced")
+                val response = "I could not produce an executable plan for this request."
+                completeState(runId, response)
                 taskRepository?.markCompleted(task.id, clock())
-                OrchestratorResult.Completed(runId, "Plan created; no tool actions required")
+                OrchestratorResult.Completed(runId, response)
             } else {
                 executePlan(plan, task, startIndex = 0)
             }
@@ -99,9 +100,10 @@ class AgentOrchestrator(
             taskRepository?.checkpoint(resumed, null)
 
             if (startIndex >= plan.actions.size) {
-                update(runId, AgentStatus.COMPLETED, "Persisted task was already at its final checkpoint")
+                val response = "Task resumed and was already at its final checkpoint."
+                completeState(runId, response)
                 taskRepository?.markCompleted(task.id, clock())
-                OrchestratorResult.Completed(runId, "Task resumed and completed from checkpoint")
+                OrchestratorResult.Completed(runId, response)
             } else {
                 executePlan(plan, resumed, startIndex)
             }
@@ -148,6 +150,9 @@ class AgentOrchestrator(
         startIndex: Int
     ): OrchestratorResult {
         var task = initialTask
+        var finalResponse: String? = null
+        val observations = mutableListOf<String>()
+
         for ((index, action) in plan.actions.withIndex()) {
             if (index < startIndex) continue
             currentCoroutineContext().ensureActive()
@@ -191,6 +196,13 @@ class AgentOrchestrator(
                 }
             }
 
+            val executionInput =
+                if (action.toolId == "ai.answer") {
+                    action.input + mapOf("context" to observations.joinToString("\\n").take(12_000))
+                } else {
+                    action.input
+                }
+
             update(plan.runId, AgentStatus.EXECUTING, "Executing ${tool.definition.name}")
             val startedAt = clock()
             var attempt = 0
@@ -209,7 +221,7 @@ class AgentOrchestrator(
                     title = tool.definition.name,
                     status = TaskStepStatus.RUNNING,
                     toolId = action.toolId,
-                    inputJson = action.input.toString(),
+                    inputJson = executionInput.toString(),
                     outputSummary = null,
                     attempts = attempt,
                     startedAt = startedAt,
@@ -217,11 +229,12 @@ class AgentOrchestrator(
                     errorMessage = null
                 )
                 taskRepository?.checkpoint(runningTask, runningStep)
-                journal.record(plan.runId, action, "STARTED")
+                journal.record(plan.runId, action.copy(input = executionInput), "STARTED")
 
-                val result = tool.execute(action.input)
+                val result = tool.execute(executionInput)
                 lastResult = result.status
-                journal.record(plan.runId, action, result.status.name, result.message)
+                journal.record(plan.runId, action.copy(input = executionInput), result.status.name, result.message)
+                observations += observationFor(result)
 
                 if (result.status == ToolResultStatus.CANCELLED || stopRequested) {
                     update(plan.runId, AgentStatus.CANCELLED, "Execution cancelled")
@@ -237,9 +250,31 @@ class AgentOrchestrator(
                     return OrchestratorResult.Cancelled(plan.runId)
                 }
 
+                if (result.status == ToolResultStatus.BLOCKED) {
+                    val blockedAt = clock()
+                    val reason = result.message ?: "Action requires user action"
+                    update(plan.runId, AgentStatus.BLOCKED, reason)
+                    taskRepository?.checkpoint(
+                        runningTask.copy(
+                            status = TaskStatus.BLOCKED,
+                            updatedAt = blockedAt,
+                            lastError = reason,
+                            requiresUserAction = true
+                        ),
+                        runningStep.copy(
+                            status = TaskStepStatus.BLOCKED,
+                            completedAt = blockedAt,
+                            attempts = attempt + 1,
+                            errorMessage = reason,
+                            outputSummary = boundedSummary(result.message)
+                        )
+                    )
+                    return OrchestratorResult.Blocked(plan.runId, emptySet())
+                }
+
                 if (action.requiresVerification || tool.definition.supportsVerification) {
                     update(plan.runId, AgentStatus.VERIFYING, "Verifying ${tool.definition.name}")
-                    val verification = verifier.verify(action, result)
+                    val verification = verifier.verify(action.copy(input = executionInput), result)
                     if (verification.verified) {
                         val verifiedAt = clock()
                         task = runningTask.copy(currentStep = index + 1, updatedAt = verifiedAt, lastError = null)
@@ -252,6 +287,7 @@ class AgentOrchestrator(
                                 outputSummary = boundedSummary(result.message ?: verification.message)
                             )
                         )
+                        finalResponse = (result.data["response"] as? String) ?: finalResponse
                         break
                     }
                 } else if (result.status == ToolResultStatus.SUCCESS) {
@@ -266,6 +302,7 @@ class AgentOrchestrator(
                             outputSummary = boundedSummary(result.message)
                         )
                     )
+                    finalResponse = (result.data["response"] as? String) ?: finalResponse
                     break
                 }
 
@@ -290,9 +327,12 @@ class AgentOrchestrator(
             }
         }
 
-        update(plan.runId, AgentStatus.COMPLETED, "Task completed and verified")
+        val response = finalResponse
+            ?: observations.lastOrNull()
+            ?: "Task completed and verified"
+        completeState(plan.runId, response)
         taskRepository?.markCompleted(task.id, clock())
-        return OrchestratorResult.Completed(plan.runId, "Task completed")
+        return OrchestratorResult.Completed(plan.runId, response)
     }
 
     private suspend fun failTask(task: TaskRecord, runId: String, message: String): OrchestratorResult {
@@ -306,21 +346,42 @@ class AgentOrchestrator(
             runId = runId,
             status = status,
             currentActivity = activity,
-            error = null
+            error = null,
+            result = null
+        )
+    }
+
+    private fun completeState(runId: String, response: String) {
+        _state.value = OrchestratorState(
+            runId = runId,
+            status = AgentStatus.COMPLETED,
+            currentActivity = "Task completed and verified",
+            error = null,
+            result = response
         )
     }
 
     private fun checkpointJson(runId: String, actionIndex: Int): String =
-        "{\"runId\":\"$runId\",\"actionIndex\":$actionIndex}"
-
+        """{"runId":"$runId","actionIndex":$actionIndex}"""
     private fun boundedSummary(message: String?): String? = message?.take(2_000)
+
+    private fun observationFor(
+        result: lol.vynnra.agent.core.tool.ToolResult
+    ): String = buildString {
+        result.message?.take(2_000)?.let { append(it) }
+        if (result.data.isNotEmpty()) {
+            if (isNotEmpty()) append(" | ")
+            append(result.data.toString().take(8_000))
+        }
+    }
 }
 
 data class OrchestratorState(
     val runId: String? = null,
     val status: AgentStatus = AgentStatus.IDLE,
     val currentActivity: String? = null,
-    val error: String? = null
+    val error: String? = null,
+    val result: String? = null
 )
 
 sealed interface OrchestratorResult {
