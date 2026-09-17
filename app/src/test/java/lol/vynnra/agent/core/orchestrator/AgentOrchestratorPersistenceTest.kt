@@ -16,7 +16,6 @@ import lol.vynnra.agent.core.task.TaskStepRecord
 import lol.vynnra.agent.core.task.TaskStatus
 import lol.vynnra.agent.data.memory.MemoryRepository
 import lol.vynnra.agent.data.task.TaskRepository
-import lol.vynnra.agent.core.tool.Capability
 import lol.vynnra.agent.core.tool.RiskLevel
 import lol.vynnra.agent.core.tool.ToolDefinition
 import lol.vynnra.agent.core.tool.ToolResult
@@ -92,6 +91,7 @@ class AgentOrchestratorPersistenceTest {
 
 private class FakeMemoryRepository(private val memory: MemoryRecord) : MemoryRepository {
     override fun observeEnabled(): Flow<List<MemoryRecord>> = emptyFlow()
+    override fun observeAll(): Flow<List<MemoryRecord>> = emptyFlow()
     override suspend fun upsert(memory: MemoryRecord) = Unit
     override suspend fun search(query: String, limit: Int): List<MemoryRecord> = listOf(memory)
     override suspend fun get(id: String): MemoryRecord? = memory.takeIf { it.id == id }
