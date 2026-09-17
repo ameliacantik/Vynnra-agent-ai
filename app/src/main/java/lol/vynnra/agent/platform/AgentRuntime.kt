@@ -11,6 +11,8 @@ import lol.vynnra.agent.core.orchestrator.BoundedRecoveryEngine
 import lol.vynnra.agent.core.orchestrator.ProviderBackedPlanner
 import lol.vynnra.agent.core.orchestrator.ToolRegistry
 import lol.vynnra.agent.core.security.CapabilityGate
+import lol.vynnra.agent.data.memory.MemoryRepository
+import lol.vynnra.agent.data.task.TaskRepository
 import lol.vynnra.agent.core.tool.Capability
 import lol.vynnra.agent.core.provider.AiProvider
 import lol.vynnra.agent.web.WebSearchToolRegistrar
@@ -25,7 +27,9 @@ class AgentRuntime(
     provider: AiProvider,
     modelProvider: () -> String,
     webBaseUrlProvider: () -> String = { "" },
-    webAuthTokenProvider: () -> String? = { null }
+    webAuthTokenProvider: () -> String? = { null },
+    memoryRepository: MemoryRepository? = null,
+    taskRepository: TaskRepository? = null
 ) {
     private val appContext = context.applicationContext
 
@@ -76,7 +80,9 @@ class AgentRuntime(
         registry = registry,
         capabilityGate = capabilityGate,
         verifier = AndroidVerificationEngine(AndroidController(appContext)),
-        recovery = BoundedRecoveryEngine()
+        recovery = BoundedRecoveryEngine(),
+        memoryRepository = memoryRepository,
+        taskRepository = taskRepository
     )
 
     val chatSession = AgentChatSession(
