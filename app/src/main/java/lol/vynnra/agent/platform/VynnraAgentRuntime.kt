@@ -79,4 +79,8 @@ class VynnraAgentRuntime(
         }
         if (webSearchBaseUrlProvider().trim().isNotEmpty()) add(Capability.WEB_SEARCH)
     }
+    private fun Map<String, Any?>.requiredString(key: String): String =
+        (this[key] as? String)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: error("Missing or blank input: $key")
+
 }
