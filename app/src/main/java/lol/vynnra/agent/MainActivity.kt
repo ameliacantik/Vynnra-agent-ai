@@ -16,9 +16,8 @@ import kotlinx.coroutines.launch
 import lol.vynnra.agent.core.agent.ThinkingLevel
 import lol.vynnra.agent.core.provider.OpenAiCompatibleProvider
 import lol.vynnra.agent.core.provider.ProviderConfig
-import lol.vynnra.agent.core.voice.VoiceAgentResult
-import lol.vynnra.agent.core.voice.VoiceAgentSession
 import lol.vynnra.agent.core.voice.VoiceAgentUiState
+import lol.vynnra.agent.platform.AgentRuntime
 import lol.vynnra.agent.platform.ProviderCredentialStore
 import lol.vynnra.agent.platform.ScreenCaptureConsentController
 import lol.vynnra.agent.platform.ScreenCaptureController
@@ -31,7 +30,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var screenCaptureController: ScreenCaptureController
     private lateinit var voiceController: VoiceController
     private lateinit var providerCredentialStore: ProviderCredentialStore
-    private lateinit var voiceAgentSession: VoiceAgentSession
+    private lateinit var agentRuntime: AgentRuntime
 
     private var screenCaptureGranted by mutableStateOf(false)
     private var microphoneGranted by mutableStateOf(false)
@@ -71,10 +70,12 @@ class MainActivity : ComponentActivity() {
 
         val app = application as VynnraApplication
         val provider = OpenAiCompatibleProvider { providerCredentialStore.load() }
-        voiceAgentSession = VoiceAgentSession(
+        agentRuntime = AgentRuntime(
+            context = this,
             provider = provider,
-            taskRepository = app.taskRepository,
-            modelProvider = { providerCredentialStore.load().model }
+            modelProvider = { providerCredentialStore.load().model },
+            memoryRepository = app.memoryRepository,
+            taskRepository = app.taskRepository
         )
 
         setContent {
@@ -121,22 +122,36 @@ class MainActivity : ComponentActivity() {
 
         lifecycleScope.launch {
             voiceAgentState = VoiceAgentUiState(busy = true, activity = "Thinking…")
-            when (val result = voiceAgentSession.submit(normalized, thinkingLevel)) {
-                is VoiceAgentResult.Success -> {
+            when (val result = agentRuntime.chatSession.submit(normalized, thinkingLevel)) {
+                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Success -> {
                     voiceAgentState = voiceAgentState.copy(
                         busy = false,
-                        activity = "Response ready",
+                        activity = if (result.usedTools) "Agent completed verified actions" else "Response ready",
                         replyId = System.nanoTime(),
                         reply = result.text,
                         error = null
                     )
                     if (speakResponse) voiceController.speak(result.text)
                 }
-                is VoiceAgentResult.Failed -> {
+                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Blocked -> {
                     voiceAgentState = voiceAgentState.copy(
                         busy = false,
-                        activity = "Request failed",
+                        activity = "Waiting for capability",
                         error = result.message
+                    )
+                }
+                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Failed -> {
+                    voiceAgentState = voiceAgentState.copy(
+                        busy = false,
+                        activity = "Agent failed",
+                        error = result.message
+                    )
+                }
+                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Cancelled -> {
+                    voiceAgentState = voiceAgentState.copy(
+                        busy = false,
+                        activity = "Agent cancelled",
+                        error = null
                     )
                 }
             }
