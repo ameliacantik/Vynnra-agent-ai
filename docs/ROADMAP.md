@@ -79,14 +79,14 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [x] Target verification
 
 ## Phase 7 — Browser + Files
-- [ ] Chrome automation
-- [ ] AI-native browser option
-- [ ] File agent
-- [ ] File search/read/write/move/copy/delete
-- [ ] Download/upload workflows
+- [x] Chrome automation foundation
+- [~] AI-native browser option
+- [x] File agent
+- [x] File search/read/write/move/copy/delete
+- [~] Download/upload workflows
 - [x] Storage-aware routing across Level 1 / Level 2 / Level 3
 - [x] Safe handling of protected Android paths and unavailable system areas
-- [ ] Bulk file operations with confirmation gates
+- [x] Bulk file operations with confirmation gates
 
 ## Phase 8 — Tavily Web Search
 - [ ] Server-side web search
@@ -153,17 +153,17 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest verified Phase 6 CI run:
-- Workflow run: `35189962543`
-- Build job: `105100145790`
-- Head commit: `a514b1fe475ab5678a05a0ea8c14b2850012a589`
+Latest verified Phase 7 CI run:
+- Workflow run: `35191428977`
+- Build job: `105104644185`
+- Head commit: `41cd58344fa8c57a54dd37c6f188e5ecb63384fa`
 - Build result: **success**
 - Debug APK artifact: `vynnra-agent-debug-apk`
-- Artifact ID: `10483223723`
-- Artifact size: 37,391,355 bytes (~37.4 MB)
-- Artifact SHA-256: `d220d7d45d3c2731f71e437bb800613a8e146a9f2a8e357f3631784e0412c18c`
+- Artifact ID: `10482934778`
+- Artifact size: 37,426,255 bytes (~37.4 MB)
+- Artifact SHA-256: `f40cd4647e22b35ca1a12bb2ea48085079ef373770ecf3675777ed793e3fe8c6`
 
-CI success verifies compilation and APK generation. Real-device runtime testing is still required for OEM-specific MediaProjection behavior, OCR model availability/download, and end-to-end gesture/target behavior.
+CI success verifies compilation and APK generation. Real-device runtime testing is still required for Chrome UI behavior, AI-native browser behavior, Android DocumentsUI/upload handoff, DownloadManager/OEM behavior, and end-to-end browser/file workflows.
 
 ## Vynnra Agent 1.0
 
