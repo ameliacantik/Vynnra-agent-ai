@@ -100,19 +100,19 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [ ] End-to-end Android → backend → Tavily → chat verification
 
 ## Phase 9 — Memory + Tasks
-- [~] Room schema v2 for memory and persistent tasks
-- [~] Conversation memory with bounded recent-message retrieval
-- [~] Long-term memory with relevance scoring
-- [~] User-controlled memory management
-- [~] Persistent task records and task steps
-- [~] Task lifecycle and checkpointing
-- [~] Resumable task discovery after restart
-- [~] Application-scoped memory/task repositories
-- [~] Unit coverage for memory relevance and task resume behavior
-- [ ] Chat UI memory controls
-- [ ] Task UI and task detail timeline
-- [ ] Full orchestrator integration for automatic task checkpointing
-- [ ] End-to-end process/device restart verification
+- [x] Room schema v2 for memory and persistent tasks
+- [x] Conversation memory with bounded recent-message retrieval
+- [x] Long-term memory with relevance scoring
+- [x] User-controlled memory management
+- [x] Persistent task records and task steps
+- [x] Task lifecycle and checkpointing
+- [x] Resumable task discovery after restart
+- [x] Application-scoped memory/task repositories
+- [x] Unit coverage for memory relevance and task resume behavior
+- [x] Chat UI memory controls
+- [x] Task UI and task detail timeline
+- [x] Full orchestrator integration for automatic task checkpointing
+- [~] End-to-end process/device restart verification
 
 ## Phase 10 — Voice
 - [ ] Speech-to-text
@@ -165,7 +165,13 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest fully verified CI checkpoint before Phase 9 work:
+Latest Phase 9 checkpoint:
+- Current Phase 9 implementation commit series includes persistent memory/task UI, orchestrator checkpoint integration, and restart persistence coverage.
+- Workflow run `35197665052` compiled the APK successfully and passed `testDebugUnitTest`.
+- The Android emulator restart stage timed out at the hosted runner's emulator/test boundary (exit code 124) after prolonged ADB/emulator startup; no application assertion failure was reported in the captured log.
+- The restart item therefore remains `[~]` pending reliable emulator/device verification.
+
+The previous fully verified CI checkpoint before Phase 9 work remains:
 - Workflow run: `35192201354`
 - Build job: `105107062337`
 - Head commit: `e158e62e8b4c5f02089b1f9e946e2d3b8404d2ab`
@@ -174,8 +180,6 @@ Latest fully verified CI checkpoint before Phase 9 work:
 - Artifact ID: `10484980571`
 - Artifact size: 37,447,990 bytes
 - Artifact SHA-256: `ac32fac55e7ff1fac710f498b5e6a5e947d716f66f3a4717b929ab655c674942`
-
-Current Phase 9 verification run is tracked separately. Phase 9 checklist items remain `[~]` until the new implementation has passed CI/build verification. Real-device runtime testing is still required for restart behavior and the unfinished Phase 8/9 end-to-end boundaries.
 
 ## Vynnra Agent 1.0
 
