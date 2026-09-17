@@ -115,10 +115,15 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [~] End-to-end process/device restart verification
 
 ## Phase 10 — Voice
-- [ ] Speech-to-text
-- [ ] Text-to-speech
-- [ ] Voice agent mode
-- [ ] Voice-triggered tasks
+- [~] Speech-to-text controller
+- [~] Text-to-speech controller
+- [~] Voice state model and cancellation controls
+- [~] Microphone permission flow
+- [~] Voice input control in the main composer
+- [ ] Voice agent mode connected to the live AI/provider loop
+- [ ] Spoken assistant responses from live agent output
+- [ ] Voice-triggered persistent tasks
+- [ ] Real-device microphone/STT/TTS verification
 
 ## Phase 11 — Background Agent
 - [ ] Foreground/background task execution
@@ -170,6 +175,8 @@ Latest Phase 9 checkpoint:
 - Workflow run `35197665052` compiled the APK successfully and passed `testDebugUnitTest`.
 - The Android emulator restart stage timed out at the hosted runner's emulator/test boundary (exit code 124) after prolonged ADB/emulator startup; no application assertion failure was reported in the captured log.
 - The restart item therefore remains `[~]` pending reliable emulator/device verification.
+
+Phase 10 voice work is now on the repository as a foundation and remains `[~]` until the new controller/UI changes pass CI and real-device voice behavior is verified.
 
 The previous fully verified CI checkpoint before Phase 9 work remains:
 - Workflow run: `35192201354`
