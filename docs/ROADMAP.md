@@ -153,16 +153,16 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest verified CI run for the current Android control implementation:
-- Workflow run: `35184927438`
-- Build job: `105084828273`
-- Result: **success**
+Latest verified CI run for the screen-consent and screen-inspection implementation:
+- Workflow run: `35185995240`
+- Build job: `105088070634`
+- Build result: **success**
 - Debug APK artifact: `vynnra-agent-debug-apk`
-- Artifact ID: `10481289826`
+- Artifact ID: `10482750500`
 - Artifact size: ~16.9 MB
-- Artifact SHA-256: `236ad088bd30498dc02ae5712e5d9641ab67674633f2c87170d70e4480c2ff52`
+- Artifact SHA-256: `6ca3c55e06c8b64b59b6697ba7c964507ae70d8070506c370c3271149fad0deb`
 
-CI success verifies that the project compiles and the debug APK is produced. It does not replace real-device runtime verification.
+CI success verifies compilation and APK generation. Real-device runtime verification is still required before calling the entire Android-control stack production-ready.
 
 ## Vynnra Agent 1.0
 
