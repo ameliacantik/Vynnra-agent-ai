@@ -88,6 +88,7 @@ fun VynnraAgentShell(
     onStartVoice: () -> Unit,
     onStopVoice: () -> Unit,
     onStopSpeaking: () -> Unit,
+    onStopAgent: () -> Unit,
     onSendMessage: (String, ThinkingLevel, Boolean) -> Unit,
     onSaveProviderConfig: (ProviderConfig) -> Unit
 ) {
@@ -185,7 +186,7 @@ fun VynnraAgentShell(
                         tint = if (voiceState.status == VoiceStatus.LISTENING) VynnraPurple else VynnraMuted
                     )
                 }
-                IconButton(onClick = { messages += AgentMessage(AgentMessageRole.ASSISTANT, "Emergency stop is available from the agent controller.") }) {
+                IconButton(onClick = onStopAgent, enabled = voiceAgentState.busy) {
                     Icon(Icons.Outlined.StopCircle, contentDescription = "Stop agent", tint = VynnraMuted)
                 }
                 IconButton(onClick = {
