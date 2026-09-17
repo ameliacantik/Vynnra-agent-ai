@@ -68,7 +68,10 @@ private data class UiMessage(val role: Role, val text: String)
 private enum class Role { USER, ASSISTANT }
 
 @Composable
-fun VynnraShell() {
+fun VynnraShell(
+    screenCaptureGranted: Boolean = false,
+    onRequestScreenCapture: () -> Unit = {}
+) {
     var drawerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
     var permissionOpen by remember { mutableStateOf(false) }
@@ -156,12 +159,29 @@ fun VynnraShell() {
         if (permissionOpen) {
             ModalPanel(title = "Permission Center", onClose = { permissionOpen = false }) {
                 PermissionRow("Accessibility Control", false)
-                PermissionRow("Screen Capture", false)
+                PermissionRow("Screen Capture", screenCaptureGranted)
+                if (!screenCaptureGranted) {
+                    Spacer(Modifier.height(6.dp))
+                    Button(
+                        onClick = onRequestScreenCapture,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Grant Screen Capture")
+                    }
+                } else {
+                    Text(
+                        "Screen capture consent granted for this app session. The screenshot pipeline will consume this grant in Phase 6.",
+                        color = VynnraMuted
+                    )
+                }
                 PermissionRow("Files", false)
                 PermissionRow("Overlay", false)
                 PermissionRow("Microphone", false)
                 Spacer(Modifier.height(8.dp))
-                Text("Phase 2 establishes the UI. Android capabilities will be wired in Phase 4–5.", color = VynnraMuted)
+                Text(
+                    "Permissions are user-controlled. Vynnra only uses capabilities that Android has granted.",
+                    color = VynnraMuted
+                )
             }
         }
     }

@@ -141,6 +141,61 @@ class AndroidFindTextTool(private val controller: AndroidController) : VynnraToo
     }
 }
 
+data class InspectScreenInput(val maxNodes: Int = 300)
+
+class AndroidInspectScreenTool(private val controller: AndroidController) : VynnraTool<InspectScreenInput> {
+    override val definition = toolDefinition(
+        id = "android.inspect_screen",
+        name = "Inspect Screen",
+        description = "Read a bounded snapshot of the active Accessibility UI tree, including labels, bounds and interaction state.",
+        requiredCapabilities = setOf(Capability.SCREEN_READ, Capability.ACCESSIBILITY_CONTROL),
+        riskLevel = RiskLevel.LOW,
+        supportsVerification = true
+    )
+
+    override suspend fun execute(input: InspectScreenInput): ToolResult {
+        val snapshot = controller.inspectScreen(input.maxNodes)
+            ?: return ToolResult(
+                status = ToolResultStatus.FAILED,
+                message = "Active accessibility window is unavailable"
+            )
+
+        return ToolResult(
+            status = ToolResultStatus.SUCCESS,
+            message = "Inspected ${snapshot.nodes.size} UI node(s)",
+            data = mapOf(
+                "capturedAtEpochMs" to snapshot.capturedAtEpochMs,
+                "packageName" to snapshot.packageName,
+                "rootClassName" to snapshot.rootClassName,
+                "nodeCount" to snapshot.nodes.size,
+                "nodes" to snapshot.nodes.map { node ->
+                    mapOf(
+                        "index" to node.index,
+                        "depth" to node.depth,
+                        "text" to node.text,
+                        "contentDescription" to node.contentDescription,
+                        "className" to node.className,
+                        "viewIdResourceName" to node.viewIdResourceName,
+                        "left" to node.left,
+                        "top" to node.top,
+                        "right" to node.right,
+                        "bottom" to node.bottom,
+                        "clickable" to node.clickable,
+                        "editable" to node.editable,
+                        "enabled" to node.enabled,
+                        "focusable" to node.focusable,
+                        "focused" to node.focused,
+                        "selected" to node.selected,
+                        "scrollable" to node.scrollable,
+                        "visibleToUser" to node.visibleToUser,
+                        "actions" to node.actions
+                    )
+                }
+            )
+        )
+    }
+}
+
 private fun toolDefinition(
     id: String,
     name: String,

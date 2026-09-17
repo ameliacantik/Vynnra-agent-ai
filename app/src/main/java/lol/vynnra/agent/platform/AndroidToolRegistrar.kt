@@ -2,7 +2,7 @@ package lol.vynnra.agent.platform
 
 import lol.vynnra.agent.core.orchestrator.ToolRegistry
 
-/** Registers the Phase 5 Android tools in the central Vynnra tool registry. */
+/** Registers the Android tools in the central Vynnra tool registry. */
 object AndroidToolRegistrar {
     fun registerAll(registry: ToolRegistry, controller: AndroidController) {
         registry.register(ToolRegistry.adapter(AndroidBackTool(controller)) { Unit })
@@ -45,6 +45,11 @@ object AndroidToolRegistrar {
             FindTextInput(
                 text = input.requiredString("text"),
                 ignoreCase = input["ignoreCase"] as? Boolean ?: true
+            )
+        })
+        registry.register(ToolRegistry.adapter(AndroidInspectScreenTool(controller)) { input ->
+            InspectScreenInput(
+                maxNodes = (input["maxNodes"] as? Number)?.toInt()?.coerceIn(1, 500) ?: 300
             )
         })
     }

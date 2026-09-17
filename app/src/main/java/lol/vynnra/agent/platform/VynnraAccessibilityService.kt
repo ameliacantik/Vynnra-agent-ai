@@ -97,6 +97,9 @@ class VynnraAccessibilityService : AccessibilityService() {
         return AndroidControlResult(ok, if (ok) "Clicked: $text" else "Click rejected: $text")
     }
 
+    fun inspectScreen(maxNodes: Int = 300): ScreenSnapshot? =
+        ScreenInspector.capture(rootInActiveWindow, maxNodes)
+
     private fun dispatch(gesture: GestureDescription, name: String): AndroidControlResult {
         val callback = object : GestureResultCallback() {
             override fun onCompleted(gestureDescription: GestureDescription?) = Unit

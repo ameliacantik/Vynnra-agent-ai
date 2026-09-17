@@ -57,6 +57,9 @@ class AndroidController(private val context: Context) {
     fun findText(text: String, ignoreCase: Boolean = true): List<UiElementInfo> =
         VynnraAccessibilityService.current()?.findText(text, ignoreCase).orEmpty()
 
+    fun inspectScreen(maxNodes: Int = 300): ScreenSnapshot? =
+        VynnraAccessibilityService.current()?.inspectScreen(maxNodes)
+
     private fun serviceOrBlocked(
         action: (VynnraAccessibilityService) -> AndroidControlResult
     ): AndroidControlResult {
