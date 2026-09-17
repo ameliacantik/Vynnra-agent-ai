@@ -12,6 +12,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import lol.vynnra.agent.core.agent.ThinkingLevel
 import lol.vynnra.agent.core.provider.OpenAiCompatibleProvider
@@ -36,6 +37,7 @@ class MainActivity : ComponentActivity() {
     private var microphoneGranted by mutableStateOf(false)
     private var providerConfig by mutableStateOf(ProviderConfig("", "", ""))
     private var voiceAgentState by mutableStateOf(VoiceAgentUiState())
+    private var agentJob: Job? = null
 
     private val screenCaptureLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -100,7 +102,10 @@ class MainActivity : ComponentActivity() {
                     onStartVoice = { voiceController.startListening() },
                     onStopVoice = { voiceController.stopListening() },
                     onStopSpeaking = { voiceController.stopSpeaking() },
-                    onStopAgent = { agentRuntime.orchestrator.requestStop() },
+                    onStopAgent = {
+                        agentRuntime.orchestrator.requestStop()
+                        agentJob?.cancel()
+                    },
                     onSendMessage = { text, thinkingLevel, speakResponse ->
                         submitAgentRequest(text, thinkingLevel, speakResponse)
                     },
@@ -121,7 +126,8 @@ class MainActivity : ComponentActivity() {
         val normalized = text.trim()
         if (normalized.isEmpty() || voiceAgentState.busy) return
 
-        lifecycleScope.launch {
+        agentJob?.cancel()
+        agentJob = lifecycleScope.launch {
             voiceAgentState = VoiceAgentUiState(busy = true, activity = "Thinking…")
             when (val result = agentRuntime.chatSession.submit(normalized, thinkingLevel)) {
                 is lol.vynnra.agent.core.orchestrator.AgentChatResult.Success -> {
@@ -156,10 +162,14 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }.also { job ->
+            job.invokeOnCompletion { if (agentJob === job) agentJob = null }
         }
     }
 
     override fun onDestroy() {
+        agentJob?.cancel()
+
         voiceController.shutdown()
         super.onDestroy()
     }
