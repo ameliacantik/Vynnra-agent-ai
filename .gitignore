@@ -1,0 +1,20 @@
+# Android / Gradle
+.gradle/
+build/
+app/build/
+local.properties
+
+# Secrets / local configuration
+.env
+.env.*
+!.env.example
+server/.env
+server/.env.*
+!server/.env.example
+
+# Node
+node_modules/
+
+# IDE
+.idea/
+*.iml
