@@ -17,7 +17,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var screenCaptureController: ScreenCaptureController
 
     private var screenCaptureGranted by mutableStateOf(false)
-    private var screenCaptureActive by mutableStateOf(false)
 
     private val screenCaptureLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -25,8 +24,9 @@ class MainActivity : ComponentActivity() {
                 result.resultCode,
                 result.data
             )
-            val grant = screenCaptureConsentController.currentGrant()
-            screenCaptureActive = grant != null && screenCaptureController.start(grant)
+            screenCaptureConsentController.currentGrant()?.let { grant ->
+                screenCaptureController.start(grant)
+            }
         }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,21 +34,15 @@ class MainActivity : ComponentActivity() {
         screenCaptureConsentController = ScreenCaptureConsentController(this)
         screenCaptureController = ScreenCaptureController(this)
         screenCaptureGranted = screenCaptureConsentController.isGranted()
-        screenCaptureActive = screenCaptureController.isActive()
 
         setContent {
             VynnraTheme {
                 VynnraShell(
                     screenCaptureGranted = screenCaptureGranted,
-                    screenCaptureActive = screenCaptureActive,
                     onRequestScreenCapture = {
                         screenCaptureLauncher.launch(
                             screenCaptureConsentController.createConsentIntent()
                         )
-                    },
-                    onStopScreenCapture = {
-                        screenCaptureController.stop()
-                        screenCaptureActive = false
                     }
                 )
             }
