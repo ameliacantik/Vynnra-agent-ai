@@ -87,6 +87,73 @@ class AgentOrchestratorPersistenceTest {
         assertTrue(tasks.steps.any { it.status.name == "VERIFIED" })
         assertEquals(1, tasks.completedTaskIds.size)
     }
+
+    @Test
+    fun resume_pending_tasks_reuses_task_and_skips_verified_checkpoint() = runBlocking {
+        val tasks = FakeTaskRepository()
+        val persisted = TaskRecord(
+            id = "persisted-task",
+            title = "Resume me",
+            goal = "Continue persisted work",
+            status = TaskStatus.PAUSED,
+            currentStep = 1,
+            totalSteps = 2,
+            checkpointJson = "{\"runId\":\"old\",\"actionIndex\":1}",
+            lastError = null,
+            requiresUserAction = false,
+            createdAt = 1L,
+            updatedAt = 2L,
+            completedAt = null
+        )
+        tasks.created += persisted
+
+        val executed = CopyOnWriteArrayList<String>()
+        val planner = object : AgentPlanner {
+            override suspend fun createPlan(goal: String, thinkingLevel: ThinkingLevel): AgentPlan =
+                AgentPlan(
+                    runId = "planner",
+                    goal = goal,
+                    actions = listOf(
+                        AgentAction("first", "resume.tool", mapOf("value" to "first")),
+                        AgentAction("second", "resume.tool", mapOf("value" to "second"))
+                    ),
+                    thinkingLevel = thinkingLevel
+                )
+        }
+        val registry = ToolRegistry().apply {
+            register(object : RegisteredTool {
+                override val definition = ToolDefinition(
+                    id = "resume.tool",
+                    name = "Resume tool",
+                    description = "resume test",
+                    requiredCapabilities = emptySet(),
+                    riskLevel = RiskLevel.LOW,
+                    supportsVerification = false
+                )
+
+                override suspend fun execute(input: Map<String, Any?>): ToolResult {
+                    executed += input["value"].toString()
+                    return ToolResult(ToolResultStatus.SUCCESS, message = input["value"].toString())
+                }
+            })
+        }
+
+        val results = AgentOrchestrator(
+            planner = planner,
+            registry = registry,
+            capabilityGate = CapabilityGate { emptySet() },
+            taskRepository = tasks
+        ).resumePendingTasks()
+
+        assertEquals(1, results.size)
+        assertTrue(results.single() is OrchestratorResult.Completed)
+        assertEquals(listOf("second"), executed.toList())
+        assertEquals(1, tasks.created.size)
+        assertEquals(persisted.id, tasks.created.single().id)
+        assertEquals(TaskStatus.COMPLETED, tasks.created.single().status)
+        assertEquals(1, tasks.completedTaskIds.size)
+        assertTrue(tasks.created.single().checkpointJson?.contains("actionIndex") == true)
+    }
 }
 
 private class FakeMemoryRepository(private val memory: MemoryRecord) : MemoryRepository {
