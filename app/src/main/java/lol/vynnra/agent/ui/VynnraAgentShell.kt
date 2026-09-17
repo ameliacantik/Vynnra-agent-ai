@@ -57,6 +57,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import lol.vynnra.agent.core.agent.ThinkingLevel
 import lol.vynnra.agent.core.provider.ProviderConfig
+import lol.vynnra.agent.core.orchestrator.OrchestratorState
+import lol.vynnra.agent.core.agent.AgentStatus
 import lol.vynnra.agent.core.voice.VoiceAgentUiState
 import lol.vynnra.agent.data.memory.MemoryRepository
 import lol.vynnra.agent.data.task.TaskRepository
@@ -81,13 +83,21 @@ fun VynnraAgentShell(
     screenCaptureGranted: Boolean,
     onRequestScreenCapture: () -> Unit,
     microphoneGranted: Boolean,
+    accessibilityGranted: Boolean,
+    filesGranted: Boolean,
+    overlayGranted: Boolean,
     voiceState: VoiceUiState,
     voiceAgentState: VoiceAgentUiState,
+    orchestratorState: OrchestratorState,
     providerConfig: ProviderConfig,
     onRequestMicrophone: () -> Unit,
+    onRequestAccessibility: () -> Unit,
+    onRequestFiles: () -> Unit,
+    onRequestOverlay: () -> Unit,
     onStartVoice: () -> Unit,
     onStopVoice: () -> Unit,
     onStopSpeaking: () -> Unit,
+    onStopAgent: () -> Unit,
     onSendMessage: (String, ThinkingLevel, Boolean) -> Unit,
     onSaveProviderConfig: (ProviderConfig) -> Unit
 ) {
@@ -108,7 +118,8 @@ fun VynnraAgentShell(
     LaunchedEffect(voiceState.finalText) {
         val transcript = voiceState.finalText.trim()
         if (transcript.isNotEmpty()) {
-            message = transcript
+            messages += AgentMessage(AgentMessageRole.USER, transcript)
+            message = ""
             onSendMessage(transcript, thinkingLevel, true)
         }
     }
@@ -128,7 +139,11 @@ fun VynnraAgentShell(
                 onMenu = { drawerOpen = true },
                 onThinkingChange = { thinkingLevel = it }
             )
-            StatusStrip(voiceState = voiceState, agentState = voiceAgentState)
+            StatusStrip(
+                voiceState = voiceState,
+                agentState = voiceAgentState,
+                orchestratorState = orchestratorState
+            )
             MessageArea(messages, Modifier.weight(1f))
 
             if (voiceState.partialText.isNotBlank()) {
@@ -185,7 +200,16 @@ fun VynnraAgentShell(
                         tint = if (voiceState.status == VoiceStatus.LISTENING) VynnraPurple else VynnraMuted
                     )
                 }
-                IconButton(onClick = { messages += AgentMessage(AgentMessageRole.ASSISTANT, "Emergency stop is available from the agent controller.") }) {
+                IconButton(
+                    onClick = onStopAgent,
+                    enabled = voiceAgentState.busy || orchestratorState.status in setOf(
+                        AgentStatus.UNDERSTANDING,
+                        AgentStatus.PLANNING,
+                        AgentStatus.EXECUTING,
+                        AgentStatus.VERIFYING,
+                        AgentStatus.RECOVERING
+                    )
+                ) {
                     Icon(Icons.Outlined.StopCircle, contentDescription = "Stop agent", tint = VynnraMuted)
                 }
                 IconButton(onClick = {
@@ -286,9 +310,18 @@ fun VynnraAgentShell(
                 if (!screenCaptureGranted) {
                     Button(onClick = onRequestScreenCapture, modifier = Modifier.fillMaxWidth()) { Text("Grant Screen Capture") }
                 }
-                PermissionLine("Accessibility Control", false)
-                PermissionLine("Files", false)
-                PermissionLine("Overlay", false)
+                PermissionLine("Accessibility Control", accessibilityGranted)
+                if (!accessibilityGranted) {
+                    Button(onClick = onRequestAccessibility, modifier = Modifier.fillMaxWidth()) { Text("Enable Accessibility Control") }
+                }
+                PermissionLine("Files", filesGranted)
+                if (!filesGranted) {
+                    Button(onClick = onRequestFiles, modifier = Modifier.fillMaxWidth()) { Text("Grant Full Storage Access") }
+                }
+                PermissionLine("Overlay", overlayGranted)
+                if (!overlayGranted) {
+                    Button(onClick = onRequestOverlay, modifier = Modifier.fillMaxWidth()) { Text("Grant Overlay") }
+                }
                 PermissionLine("Microphone", microphoneGranted)
                 if (!microphoneGranted) {
                     Button(onClick = onRequestMicrophone, modifier = Modifier.fillMaxWidth()) { Text("Grant Microphone") }
@@ -332,15 +365,26 @@ private fun ThinkingSelector(selected: ThinkingLevel, onSelected: (ThinkingLevel
 }
 
 @Composable
-private fun StatusStrip(voiceState: VoiceUiState, agentState: VoiceAgentUiState) {
+private fun StatusStrip(
+    voiceState: VoiceUiState,
+    agentState: VoiceAgentUiState,
+    orchestratorState: OrchestratorState
+) {
     val statusText = when {
         voiceState.status == VoiceStatus.LISTENING -> "Listening — speak naturally"
         voiceState.status == VoiceStatus.SPEAKING -> "Speaking — Vynnra is reading the response"
-        agentState.busy -> "Thinking — processing your request"
-        agentState.error != null -> "AI error — check provider settings"
+        orchestratorState.status == AgentStatus.UNDERSTANDING -> "Understanding — interpreting your request"
+        orchestratorState.status == AgentStatus.PLANNING -> "Planning — selecting safe actions"
+        orchestratorState.status == AgentStatus.EXECUTING -> "Acting — executing ${orchestratorState.currentActivity ?: "tool"}"
+        orchestratorState.status == AgentStatus.VERIFYING -> "Verifying — checking the result"
+        orchestratorState.status == AgentStatus.RECOVERING -> "Recovering — retrying safely"
+        orchestratorState.status == AgentStatus.BLOCKED -> "Blocked — permission or confirmation required"
+        orchestratorState.status == AgentStatus.CANCELLED -> "Stopped — agent execution cancelled"
+        agentState.error != null -> "AI error — ${agentState.error}"
         voiceState.status == VoiceStatus.ERROR -> "Voice error — ${voiceState.errorMessage ?: "check permissions"}"
         voiceState.status == VoiceStatus.UNSUPPORTED -> "Voice unavailable on this device"
-        else -> "Ready — memory, tasks, voice, and AI provider enabled"
+        orchestratorState.status == AgentStatus.FAILED -> "Agent error — ${orchestratorState.error ?: "request failed"}"
+        else -> "Ready — Vynnra agent is connected"
     }
     Surface(color = VynnraPanel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
