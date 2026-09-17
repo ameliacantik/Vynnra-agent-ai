@@ -38,7 +38,12 @@ class VynnraAgentRuntime(
             registry = registry,
             baseUrlProvider = webSearchBaseUrlProvider
         )
-        registry.register(AiAnswerTool(provider, modelProvider))
+        registry.register(ToolRegistry.adapter(AiAnswerTool(provider, modelProvider)) { input ->
+            AiAnswerInput(
+                prompt = input.requiredString("prompt"),
+                context = input["context"] as? String ?: ""
+            )
+        })
 
         orchestrator = AgentOrchestrator(
             planner = AiAgentPlanner(
@@ -48,7 +53,7 @@ class VynnraAgentRuntime(
             ),
             registry = registry,
             capabilityGate = CapabilityGate(::currentCapabilities),
-            verifier = DefaultVerificationEngine(),
+            verifier = AndroidVerificationEngine(controller),
             recovery = BoundedRecoveryEngine(),
             journal = ActionJournal(),
             memoryRepository = memoryRepository,
@@ -57,6 +62,7 @@ class VynnraAgentRuntime(
     }
 
     fun currentCapabilities(): Set<Capability> = buildSet {
+
         add(Capability.FILE_READ)
         add(Capability.FILE_WRITE)
         if (microphoneGranted()) add(Capability.MICROPHONE)
