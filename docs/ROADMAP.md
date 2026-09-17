@@ -77,6 +77,11 @@
 - [ ] File agent
 - [ ] File search/read/write/move/copy/delete
 - [ ] Download/upload workflows
+- [ ] Full Storage capability tier selected as the target default for user-authorized broad shared-storage access
+- [ ] All-files access setup/status flow where supported and appropriate
+- [ ] Storage capability reporting: ACCESS_GRANTED / ACCESS_PARTIAL / ACCESS_DENIED / NOT_SUPPORTED
+- [ ] Explicit handling of Android-protected app-private/system areas without claiming unrestricted filesystem access
+- [ ] Confirmation gate for destructive file operations (delete/overwrite/bulk move)
 
 ## Phase 8 — Tavily Web Search
 - [ ] Server-side web search
