@@ -21,12 +21,14 @@ class AgentOrchestratorLiveIntegrationTest {
     fun orchestrator_executes_ai_answer_and_returns_real_response() = kotlinx.coroutines.runBlocking {
         val registry = ToolRegistry()
         val provider = FakeAnswerProvider("The real agent path is active.")
-        registry.register(AiAnswerTool(provider) { "test-model" }.let { tool ->
-            object : RegisteredTool {
-                override val definition = tool.definition
-                override suspend fun execute(input: Map<String, Any?>) = tool.execute(input)
+        registry.register(
+            ToolRegistry.adapter(AiAnswerTool(provider) { "test-model" }) { input ->
+                mapOf(
+                    "prompt" to (input["prompt"] as? String ?: error("prompt missing")),
+                    "context" to (input["context"] as? String ?: "")
+                ).let { lol.vynnra.agent.platform.AiAnswerInput(it["prompt"] as String, it["context"] as String) }
             }
-        })
+        )
         val planner = object : AgentPlanner {
             override suspend fun createPlan(goal: String, thinkingLevel: ThinkingLevel): AgentPlan = AgentPlan(
                 runId = "planner-run",
