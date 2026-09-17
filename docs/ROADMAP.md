@@ -50,7 +50,7 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 ## Phase 4 — Permission Center
 - [x] Capability inventory
 - [x] Accessibility permission flow
-- [ ] Screen-capture consent flow
+- [x] Screen-capture consent flow
 - [x] Storage/file capability flow
 - [x] Storage access levels: Level 1 / Level 2 / Level 3
 - [x] Level 1 — Standard / Scoped Storage: SAF + app-owned and user-selected files/directories
@@ -65,7 +65,7 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 
 ## Phase 5 — Android Control
 - [x] Accessibility service
-- [ ] Screen inspection
+- [x] Screen inspection
 - [x] Gesture/input execution
 - [x] App launching
 - [x] Global navigation actions
