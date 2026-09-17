@@ -7,8 +7,6 @@ import lol.vynnra.agent.core.provider.AiProvider
 import lol.vynnra.agent.core.provider.AiRequest
 import lol.vynnra.agent.core.provider.VynnraSystemPrompt
 import lol.vynnra.agent.core.tool.ToolDefinition
-import org.json.JSONArray
-import org.json.JSONObject
 
 interface AgentPlanner {
     suspend fun createPlan(goal: String, thinkingLevel: ThinkingLevel): AgentPlan
@@ -37,7 +35,7 @@ class AiAgentPlanner(
                     AiMessage(
                         AiMessage.Role.SYSTEM,
                         """
-                        ${VynnraSystemPrompt.value}
+                        \${VynnraSystemPrompt.value}
 
                         You are the Vynnra execution planner.
                         Produce a short executable plan as JSON only. Do not output markdown,
@@ -54,12 +52,10 @@ class AiAgentPlanner(
                           explicitly confirmed that action in this request.
                         - For ordinary questions or requests that need a natural-language response,
                           finish with "ai.answer".
-                        - Use thinking level: ${thinkingLevel.name}.
+                        - Use thinking level: \${thinkingLevel.name}.
 
                         JSON schema:
-                        {"actions":[
-                          {"id":"a1","tool":"tool.id","input":{},"verify":true}
-                        ]}
+                        {"actions":[{"id":"a1","tool":"tool.id","input":{},"verify":true}]}
                         """.trimIndent() + "\n\nTool catalog:\n" + toolCatalog()
                     ),
                     AiMessage(AiMessage.Role.USER, goal.trim())
@@ -72,19 +68,23 @@ class AiAgentPlanner(
 
     private fun parsePlan(raw: String, goal: String, thinkingLevel: ThinkingLevel): AgentPlan {
         val jsonText = extractJson(raw)
-        val root = runCatching { JSONObject(jsonText) }.getOrElse {
+        val root = runCatching { JsonValueParser(jsonText).parseObject() }.getOrElse {
             return fallbackPlan(goal, thinkingLevel)
         }
-        val jsonActions = root.optJSONArray("actions") ?: return fallbackPlan(goal, thinkingLevel)
+        val rawActions = root["actions"] as? List<*> ?: return fallbackPlan(goal, thinkingLevel)
         val known = toolDefinitionsProvider().map { it.id }.toSet()
         val actions = buildList {
-            for (index in 0 until minOf(jsonActions.length(), maxActions.coerceAtLeast(1))) {
-                val item = jsonActions.optJSONObject(index) ?: continue
-                val toolId = item.optString("tool").trim()
+            for ((index, rawAction) in rawActions.withIndex()) {
+                if (size >= maxActions.coerceAtLeast(1)) break
+                val item = rawAction as? Map<*, *> ?: continue
+                val toolId = (item["tool"] as? String)?.trim().orEmpty()
                 if (toolId.isEmpty() || toolId !in known) continue
-                val input = item.optJSONObject("input")?.toMap().orEmpty()
-                val id = item.optString("id").trim().ifEmpty { "a$index" }
-                val verify = item.optBoolean("verify", false)
+                val input = (item["input"] as? Map<*, *>)
+                    ?.entries
+                    ?.associate { (key, value) -> key.toString() to value }
+                    .orEmpty()
+                val id = (item["id"] as? String)?.trim().takeUnless { it.isNullOrEmpty() } ?: "a$index"
+                val verify = item["verify"] as? Boolean ?: false
                 add(AgentAction(id = id, toolId = toolId, input = input, requiresVerification = verify))
             }
         }
@@ -114,18 +114,14 @@ class AiAgentPlanner(
 
     private fun toolCatalog(): String = buildString {
         toolDefinitionsProvider().forEach { tool ->
-            append(
-                JSONObject()
-                    .put("id", tool.id)
-                    .put("name", tool.name)
-                    .put("description", tool.description)
-                    .put("requiredCapabilities", tool.requiredCapabilities.map { it.name })
-                    .put("riskLevel", tool.riskLevel.name)
-                    .put("requiresConfirmation", tool.requiresConfirmation)
-                    .put("supportsVerification", tool.supportsVerification)
-                    .toString()
-            )
-            append('\n')
+            append("id=").append(tool.id)
+                .append("; name=").append(tool.name)
+                .append("; description=").append(tool.description)
+                .append("; capabilities=").append(tool.requiredCapabilities.joinToString(","))
+                .append("; risk=").append(tool.riskLevel.name)
+                .append("; confirmation=").append(tool.requiresConfirmation)
+                .append("; verification=").append(tool.supportsVerification)
+                .append("\n")
         }
     }
 
@@ -149,22 +145,128 @@ class FoundationPlanner : AgentPlanner {
         )
 }
 
-private fun JSONObject.toMap(): Map<String, Any?> =
-    keys().asSequence().associateWith { key ->
-        when (val value = opt(key)) {
-            JSONObject.NULL -> null
-            is JSONObject -> value.toMap()
-            is JSONArray -> value.toList()
-            else -> value
+private class JsonValueParser(private val source: String) {
+    private var index = 0
+
+    fun parseObject(): Map<String, Any?> {
+        skipWhitespace()
+        expect('{')
+        val result = linkedMapOf<String, Any?>()
+        skipWhitespace()
+        if (peek('}')) {
+            index++
+            return result
+        }
+        while (true) {
+            skipWhitespace()
+            val key = parseString()
+            skipWhitespace()
+            expect(':')
+            val value = parseValue()
+            result[key] = value
+            skipWhitespace()
+            when (peek()) {
+                ',' -> index++
+                '}' -> { index++; return result }
+                else -> error("Expected comma or object end at index $index")
+            }
         }
     }
 
-private fun JSONArray.toList(): List<Any?> =
-    (0 until length()).map { index ->
-        when (val value = opt(index)) {
-            JSONObject.NULL -> null
-            is JSONObject -> value.toMap()
-            is JSONArray -> value.toList()
-            else -> value
+    private fun parseValue(): Any? {
+        skipWhitespace()
+        return when (peek()) {
+            '{' -> parseObject()
+            '[' -> parseArray()
+            '"' -> parseString()
+            't' -> parseLiteral("true", true)
+            'f' -> parseLiteral("false", false)
+            'n' -> parseLiteral("null", null)
+            else -> parseNumber()
         }
     }
+
+    private fun parseArray(): List<Any?> {
+        expect('[')
+        val result = mutableListOf<Any?>()
+        skipWhitespace()
+        if (peek(']')) {
+            index++
+            return result
+        }
+        while (true) {
+            result += parseValue()
+            skipWhitespace()
+            when (peek()) {
+                ',' -> index++
+                ']' -> { index++; return result }
+                else -> error("Expected comma or array end at index $index")
+            }
+        }
+    }
+
+    private fun parseString(): String {
+        expect('"')
+        val out = StringBuilder()
+        while (index < source.length) {
+            when (val ch = source[index++]) {
+                '"' -> return out.toString()
+                '\\' -> {
+                    if (index >= source.length) error("Unterminated escape")
+                    when (val escaped = source[index++]) {
+                        '"' -> out.append('"')
+                        '\\' -> out.append('\\')
+                        '/' -> out.append('/')
+                        'b' -> out.append('\b')
+                        'f' -> out.append('\u000C')
+                        'n' -> out.append('\n')
+                        'r' -> out.append('\r')
+                        't' -> out.append('\t')
+                        'u' -> {
+                            if (index + 4 > source.length) error("Incomplete unicode escape")
+                            val hex = source.substring(index, index + 4)
+                            out.append(hex.toInt(16).toChar())
+                            index += 4
+                        }
+                        else -> error("Unsupported escape: $escaped")
+                    }
+                }
+                else -> out.append(ch)
+            }
+        }
+        error("Unterminated string")
+    }
+
+    private fun parseLiteral(literal: String, value: Any?): Any? {
+        if (!source.regionMatches(index, literal, 0, literal.length)) {
+            error("Expected $literal at index $index")
+        }
+        index += literal.length
+        return value
+    }
+
+    private fun parseNumber(): Number {
+        val start = index
+        while (index < source.length && source[index] in "-+0123456789.eE") index++
+        val raw = source.substring(start, index)
+        return raw.toLongOrNull() ?: raw.toDoubleOrNull() ?: error("Invalid number: $raw")
+    }
+
+    private fun skipWhitespace() {
+        while (index < source.length && source[index].isWhitespace()) index++
+    }
+
+    private fun expect(expected: Char) {
+        skipWhitespace()
+        if (peek() != expected) error("Expected $expected at index $index")
+        index++
+    }
+
+    private fun peek(expected: Char): Boolean = peek() == expected
+
+    private fun peek(): Char {
+        skipWhitespace()
+        if (index >= source.length) error("Unexpected end of JSON")
+        return source[index]
+    }
+}
