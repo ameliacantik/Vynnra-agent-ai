@@ -9,7 +9,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import lol.vynnra.agent.platform.ScreenCaptureConsentController
 import lol.vynnra.agent.platform.ScreenCaptureController
-import lol.vynnra.agent.ui.VynnraShell
+import lol.vynnra.agent.ui.VynnraAgentShell
 import lol.vynnra.agent.ui.theme.VynnraTheme
 
 class MainActivity : ComponentActivity() {
@@ -35,9 +35,12 @@ class MainActivity : ComponentActivity() {
         screenCaptureController = ScreenCaptureController(this)
         screenCaptureGranted = screenCaptureConsentController.isGranted()
 
+        val app = application as VynnraApplication
         setContent {
             VynnraTheme {
-                VynnraShell(
+                VynnraAgentShell(
+                    memoryRepository = app.memoryRepository,
+                    taskRepository = app.taskRepository,
                     screenCaptureGranted = screenCaptureGranted,
                     onRequestScreenCapture = {
                         screenCaptureLauncher.launch(
