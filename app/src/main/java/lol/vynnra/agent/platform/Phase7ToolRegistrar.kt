@@ -31,6 +31,9 @@ object Phase7ToolRegistrar {
             mapOf("url" to input.requiredString("url"), "fileName" to input["fileName"] as? String)
         })
         registry.register(ToolRegistry.adapter(BrowserUploadTool(browser)) { Unit })
+        registry.register(ToolRegistry.adapter(NativeBrowserOpenTool(context)) { input ->
+            mapOf("url" to (input["url"] as? String))
+        })
 
         registry.register(ToolRegistry.adapter(FileListTool(files)) { input ->
             mapOf(
