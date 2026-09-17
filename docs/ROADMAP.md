@@ -112,18 +112,18 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [x] Chat UI memory controls
 - [x] Task UI and task detail timeline
 - [x] Full orchestrator integration for automatic task checkpointing
-- [~] End-to-end process/device restart verification
+- [x] End-to-end process/device restart verification
 
 ## Phase 10 — Voice
-- [~] Speech-to-text controller
-- [~] Text-to-speech controller
-- [~] Voice state model and cancellation controls
-- [~] Microphone permission flow
-- [~] Voice input control in the main composer
-- [ ] Voice agent mode connected to the live AI/provider loop
-- [ ] Spoken assistant responses from live agent output
-- [ ] Voice-triggered persistent tasks
-- [ ] Real-device microphone/STT/TTS verification
+- [x] Speech-to-text controller
+- [x] Text-to-speech controller
+- [x] Voice state model and cancellation controls
+- [x] Microphone permission flow
+- [x] Voice input control in the main composer
+- [x] Voice agent mode connected to the live AI/provider loop
+- [x] Spoken assistant responses from live agent output
+- [x] Voice-triggered persistent tasks
+- [~] Real-device microphone/STT/TTS verification
 
 ## Phase 11 — Background Agent
 - [ ] Foreground/background task execution
@@ -170,23 +170,19 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest Phase 9 checkpoint:
-- Current Phase 9 implementation commit series includes persistent memory/task UI, orchestrator checkpoint integration, and restart persistence coverage.
-- Workflow run `35197665052` compiled the APK successfully and passed `testDebugUnitTest`.
-- The Android emulator restart stage timed out at the hosted runner's emulator/test boundary (exit code 124) after prolonged ADB/emulator startup; no application assertion failure was reported in the captured log.
-- The restart item therefore remains `[~]` pending reliable emulator/device verification.
+### Phase 9 final verification
+- Workflow run `35253374317`
+- Build job `105310897491`
+- Result: **success**
+- Verified: server tests, debug APK build, JVM unit tests, KVM setup, Android restart instrumentation test, and APK artifact upload.
 
-Phase 10 voice work is now on the repository as a foundation and remains `[~]` until the new controller/UI changes pass CI and real-device voice behavior is verified.
-
-The previous fully verified CI checkpoint before Phase 9 work remains:
-- Workflow run: `35192201354`
-- Build job: `105107062337`
-- Head commit: `e158e62e8b4c5f02089b1f9e946e2d3b8404d2ab`
-- Build result: **success**
-- Debug APK artifact: `vynnra-agent-debug-apk`
-- Artifact ID: `10484980571`
-- Artifact size: 37,447,990 bytes
-- Artifact SHA-256: `ac32fac55e7ff1fac710f498b5e6a5e947d716f66f3a4717b929ab655c674942`
+### Phase 10 implementation verification
+- Workflow run `35260438777`
+- Build job `105334509816`
+- Result: **success**
+- Verified: server tests, debug APK build, JVM unit tests including persistent voice-task coverage, KVM setup, Android restart instrumentation test, and APK artifact upload.
+- Voice provider integration uses the OpenAI-compatible provider abstraction and an Android Keystore-backed credential store.
+- The remaining `[~]` item is the physical-device microphone/STT/TTS gate; see `docs/PHASE_10_DEVICE_SMOKE_TEST.md`.
 
 ## Vynnra Agent 1.0
 
