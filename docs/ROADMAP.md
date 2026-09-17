@@ -50,6 +50,11 @@
 - [ ] Accessibility permission flow
 - [ ] Screen-capture consent flow
 - [ ] Storage/file capability flow
+- [ ] Storage access levels: Level 1 / Level 2 / Level 3
+- [ ] Level 1 — Standard / Scoped Storage: SAF + app-owned and user-selected files/directories
+- [ ] Level 2 — Full Storage: broad shared-storage access through the appropriate Android all-files capability where eligible
+- [ ] Level 3 — Power User: optional ADB / device-owner / elevated device-management integrations where supported
+- [ ] Explicit storage capability status: granted / partial / denied / not supported
 - [ ] Notification access
 - [ ] Overlay permission
 - [ ] Microphone permission
@@ -77,11 +82,9 @@
 - [ ] File agent
 - [ ] File search/read/write/move/copy/delete
 - [ ] Download/upload workflows
-- [ ] Full Storage capability tier selected as the target default for user-authorized broad shared-storage access
-- [ ] All-files access setup/status flow where supported and appropriate
-- [ ] Storage capability reporting: ACCESS_GRANTED / ACCESS_PARTIAL / ACCESS_DENIED / NOT_SUPPORTED
-- [ ] Explicit handling of Android-protected app-private/system areas without claiming unrestricted filesystem access
-- [ ] Confirmation gate for destructive file operations (delete/overwrite/bulk move)
+- [ ] Storage-aware routing across Level 1 / Level 2 / Level 3
+- [ ] Safe handling of protected Android paths and unavailable system areas
+- [ ] Bulk file operations with confirmation gates
 
 ## Phase 8 — Tavily Web Search
 - [ ] Server-side web search
@@ -116,6 +119,35 @@
 - [ ] Advanced device administration capabilities
 - [ ] Power-user diagnostics and controls
 - [ ] Local model support
+- [ ] Level 3 storage/system capability integration
+
+## Storage Access Strategy
+
+Vynnra uses a capability-based three-level storage model:
+
+### Level 1 — Standard / Scoped Storage
+Designed for normal Android installations without elevated storage access.
+- App-owned files
+- User-selected files and directories through Storage Access Framework
+- Standard Documents / Downloads / Pictures / media workflows where Android grants access
+- No assumption of unrestricted filesystem access
+
+### Level 2 — Full Storage
+The preferred full-storage mode for the main Vynnra Agent experience.
+- Request the appropriate Android all-files capability where the device/app distribution is eligible
+- Broad access to shared/external user storage
+- File search, read, write, copy, move and delete across accessible shared-storage locations
+- Vynnra must still detect and report paths protected by Android or unavailable to ordinary applications
+
+### Level 3 — Power User
+An optional advanced mode for specially configured devices.
+- ADB-assisted operations
+- Device-owner integrations where applicable
+- Advanced diagnostics and device administration
+- Additional system-level workflows only where the device configuration and Android security model permit them
+- Root access is not assumed; a rooted/custom-ROM environment is required for genuinely root-only operations
+
+The UI must always display the active storage level and the exact capability status instead of presenting access as universally unrestricted.
 
 ## Vynnra Agent 1.0
 
