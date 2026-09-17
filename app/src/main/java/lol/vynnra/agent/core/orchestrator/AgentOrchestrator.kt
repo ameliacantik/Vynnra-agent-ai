@@ -362,8 +362,7 @@ class AgentOrchestrator(
     }
 
     private fun checkpointJson(runId: String, actionIndex: Int): String =
-        "{\\"runId\\":\\"$runId\\",\\"actionIndex\\":$actionIndex}"
-
+        """{"runId":"$runId","actionIndex":$actionIndex}"""
     private fun boundedSummary(message: String?): String? = message?.take(2_000)
 
     private fun observationFor(
