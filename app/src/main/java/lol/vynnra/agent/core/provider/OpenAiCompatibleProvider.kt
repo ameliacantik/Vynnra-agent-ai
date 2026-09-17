@@ -276,7 +276,7 @@ class OpenAiCompatibleProvider(
     }
 
     private fun sanitizeError(payload: String): String =
-        payload.replace(Regex("\s+"), " ").trim().take(700)
+        payload.replace(Regex("\\s+"), " ").trim().take(700)
 }
 
 data class ProviderConnectionResult(
