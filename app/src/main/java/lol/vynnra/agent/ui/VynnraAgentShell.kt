@@ -63,8 +63,8 @@ import lol.vynnra.agent.ui.theme.VynnraPurpleSoft
 import lol.vynnra.agent.ui.theme.VynnraText
 
 private data class AgentSession(val id: Int, val title: String)
-private data class AgentMessage(val role: Role, val text: String)
-private enum class Role { USER, ASSISTANT }
+private data class AgentMessage(val role: AgentMessageRole, val text: String)
+private enum class AgentMessageRole { USER, ASSISTANT }
 
 @Composable
 fun VynnraAgentShell(
@@ -105,13 +105,13 @@ fun VynnraAgentShell(
                     shape = RoundedCornerShape(22.dp),
                     maxLines = 5
                 )
-                IconButton(onClick = { messages += AgentMessage(Role.ASSISTANT, "Agent execution is connected to the Phase 9 persistence layer.") }) {
+                IconButton(onClick = { messages += AgentMessage(AgentMessageRole.ASSISTANT, "Agent execution is connected to the Phase 9 persistence layer.") }) {
                     Icon(Icons.Outlined.StopCircle, contentDescription = "Stop agent", tint = VynnraMuted)
                 }
                 IconButton(onClick = {
                     val trimmed = message.trim()
                     if (trimmed.isNotEmpty()) {
-                        messages += AgentMessage(Role.USER, trimmed)
+                        messages += AgentMessage(AgentMessageRole.USER, trimmed)
                         message = ""
                     }
                 }) {
@@ -226,8 +226,8 @@ private fun MessageArea(messages: List<AgentMessage>, modifier: Modifier) {
     } else {
         LazyColumn(modifier.padding(horizontal = 14.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             items(messages) { item ->
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.role == Role.USER) Arrangement.End else Arrangement.Start) {
-                    Surface(color = if (item.role == Role.USER) VynnraPanelElevated else VynnraPanel, shape = RoundedCornerShape(18.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = if (item.role == AgentMessageRole.USER) Arrangement.End else Arrangement.Start) {
+                    Surface(color = if (item.role == AgentMessageRole.USER) VynnraPanelElevated else VynnraPanel, shape = RoundedCornerShape(18.dp)) {
                         Text(item.text, color = VynnraText, modifier = Modifier.padding(14.dp))
                     }
                 }
