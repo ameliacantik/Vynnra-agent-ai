@@ -11,6 +11,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import lol.vynnra.agent.core.agent.ThinkingLevel
+import lol.vynnra.agent.core.provider.OpenAiCompatibleProvider
+import lol.vynnra.agent.core.provider.ProviderConfig
+import lol.vynnra.agent.core.voice.VoiceAgentResult
+import lol.vynnra.agent.core.voice.VoiceAgentSession
+import lol.vynnra.agent.core.voice.VoiceAgentUiState
+import lol.vynnra.agent.platform.ProviderCredentialStore
 import lol.vynnra.agent.platform.ScreenCaptureConsentController
 import lol.vynnra.agent.platform.ScreenCaptureController
 import lol.vynnra.agent.platform.VoiceController
@@ -21,9 +30,13 @@ class MainActivity : ComponentActivity() {
     private lateinit var screenCaptureConsentController: ScreenCaptureConsentController
     private lateinit var screenCaptureController: ScreenCaptureController
     private lateinit var voiceController: VoiceController
+    private lateinit var providerCredentialStore: ProviderCredentialStore
+    private lateinit var voiceAgentSession: VoiceAgentSession
 
     private var screenCaptureGranted by mutableStateOf(false)
     private var microphoneGranted by mutableStateOf(false)
+    private var providerConfig by mutableStateOf(ProviderConfig("", "", ""))
+    private var voiceAgentState by mutableStateOf(VoiceAgentUiState())
 
     private val screenCaptureLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -47,6 +60,9 @@ class MainActivity : ComponentActivity() {
         screenCaptureConsentController = ScreenCaptureConsentController(this)
         screenCaptureController = ScreenCaptureController(this)
         voiceController = VoiceController(this)
+        providerCredentialStore = ProviderCredentialStore(this)
+        providerConfig = providerCredentialStore.load()
+
         screenCaptureGranted = screenCaptureConsentController.isGranted()
         microphoneGranted = ContextCompat.checkSelfPermission(
             this,
@@ -54,6 +70,13 @@ class MainActivity : ComponentActivity() {
         ) == PackageManager.PERMISSION_GRANTED
 
         val app = application as VynnraApplication
+        val provider = OpenAiCompatibleProvider { providerCredentialStore.load() }
+        voiceAgentSession = VoiceAgentSession(
+            provider = provider,
+            taskRepository = app.taskRepository,
+            modelProvider = { providerCredentialStore.load().model }
+        )
+
         setContent {
             VynnraTheme {
                 val voiceState by voiceController.state.collectAsStateWithLifecycle()
@@ -68,13 +91,54 @@ class MainActivity : ComponentActivity() {
                     },
                     microphoneGranted = microphoneGranted,
                     voiceState = voiceState,
+                    voiceAgentState = voiceAgentState,
+                    providerConfig = providerConfig,
                     onRequestMicrophone = {
                         microphoneLauncher.launch(Manifest.permission.RECORD_AUDIO)
                     },
                     onStartVoice = { voiceController.startListening() },
                     onStopVoice = { voiceController.stopListening() },
-                    onStopSpeaking = { voiceController.stopSpeaking() }
+                    onStopSpeaking = { voiceController.stopSpeaking() },
+                    onSendMessage = { text, thinkingLevel, speakResponse ->
+                        submitAgentRequest(text, thinkingLevel, speakResponse)
+                    },
+                    onSaveProviderConfig = { config ->
+                        providerCredentialStore.save(config)
+                        providerConfig = config
+                    }
                 )
+            }
+        }
+    }
+
+    private fun submitAgentRequest(
+        text: String,
+        thinkingLevel: ThinkingLevel,
+        speakResponse: Boolean
+    ) {
+        val normalized = text.trim()
+        if (normalized.isEmpty() || voiceAgentState.busy) return
+
+        lifecycleScope.launch {
+            voiceAgentState = VoiceAgentUiState(busy = true, activity = "Thinking…")
+            when (val result = voiceAgentSession.submit(normalized, thinkingLevel)) {
+                is VoiceAgentResult.Success -> {
+                    voiceAgentState = voiceAgentState.copy(
+                        busy = false,
+                        activity = "Response ready",
+                        replyId = System.nanoTime(),
+                        reply = result.text,
+                        error = null
+                    )
+                    if (speakResponse) voiceController.speak(result.text)
+                }
+                is VoiceAgentResult.Failed -> {
+                    voiceAgentState = voiceAgentState.copy(
+                        busy = false,
+                        activity = "Request failed",
+                        error = result.message
+                    )
+                }
             }
         }
     }
