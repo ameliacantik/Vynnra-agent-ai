@@ -20,6 +20,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".platform.VynnraBrowserActivity"
+            android:exported="false"
+            android:label="Vynnra Browser" />
         <service
             android:name=".platform.VynnraAccessibilityService"
             android:exported="false"
