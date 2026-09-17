@@ -1155,22 +1155,7 @@ private fun PermissionCenter(
     }
 }
 
-@Composable
-private fun PermissionLine(title: String, granted: Boolean) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Surface(
-            color = if (granted) VynnraPurple.copy(alpha = 0.22f) else VynnraPanel,
-            shape = CircleShape,
-            modifier = Modifier.size(11.dp)
-        ) {}
-        Spacer(Modifier.width(9.dp))
-        Text(title, color = VynnraText, modifier = Modifier.weight(1f))
-        Text(if (granted) "Granted" else "Not granted", color = if (granted) VynnraPurpleSoft else VynnraMuted)
-    }
-}
-
-@Composable
-private fun PermissionButton(label: String, onClick: () -> Unit, enabled: Boolean = true) {
+(label: String, onClick: () -> Unit, enabled: Boolean = true) {
     OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
         Text(label)
     }
