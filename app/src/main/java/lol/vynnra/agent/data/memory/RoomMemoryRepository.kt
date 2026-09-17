@@ -15,6 +15,9 @@ class RoomMemoryRepository(
     override fun observeEnabled(): Flow<List<MemoryRecord>> =
         dao.observeEnabled().map { memories -> memories.map { it.toRecord() } }
 
+    override fun observeAll(): Flow<List<MemoryRecord>> =
+        dao.observeAll().map { memories -> memories.map { it.toRecord() } }
+
     override suspend fun upsert(memory: MemoryRecord) {
         dao.upsert(memory.copy(
             importance = memory.importance.coerceIn(0f, 1f),
