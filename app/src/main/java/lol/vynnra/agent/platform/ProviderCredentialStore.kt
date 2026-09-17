@@ -14,7 +14,7 @@ class ProviderCredentialStore(context: Context) {
 
     fun load(): ProviderConfig = ProviderConfig(
         baseUrl = preferences.getString(KEY_BASE_URL, "") ?: "",
-        apiKey = decrypt(preferences.getString(KEY_API_CIPHERTEXT, null), preferences.getString(KEY_IV, null)),
+        apiKey = decrypt(preferences.getString(KEY_CIPHERTEXT, null), preferences.getString(KEY_IV, null)),
         model = preferences.getString(KEY_MODEL, "") ?: ""
     )
 
