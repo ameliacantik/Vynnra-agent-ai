@@ -148,6 +148,7 @@ class AgentOrchestrator(
         startIndex: Int
     ): OrchestratorResult {
         var task = initialTask
+        val outputs = mutableListOf<lol.vynnra.agent.core.tool.ToolResult>()
         for ((index, action) in plan.actions.withIndex()) {
             if (index < startIndex) continue
             currentCoroutineContext().ensureActive()
@@ -220,6 +221,7 @@ class AgentOrchestrator(
                 journal.record(plan.runId, action, "STARTED")
 
                 val result = tool.execute(action.input)
+                outputs += result
                 lastResult = result.status
                 journal.record(plan.runId, action, result.status.name, result.message)
 
@@ -284,7 +286,7 @@ class AgentOrchestrator(
                             outputSummary = boundedSummary(result.message)
                         )
                     )
-                    return OrchestratorResult.Failed(plan.runId, decision.message)
+                    return OrchestratorResult.Failed(plan.runId, decision.message, outputs.toList())
                 }
                 attempt++
             }
@@ -292,7 +294,7 @@ class AgentOrchestrator(
 
         update(plan.runId, AgentStatus.COMPLETED, "Task completed and verified")
         taskRepository?.markCompleted(task.id, clock())
-        return OrchestratorResult.Completed(plan.runId, "Task completed")
+        return OrchestratorResult.Completed(plan.runId, "Task completed", outputs.toList())
     }
 
     private suspend fun failTask(task: TaskRecord, runId: String, message: String): OrchestratorResult {
@@ -324,8 +326,16 @@ data class OrchestratorState(
 )
 
 sealed interface OrchestratorResult {
-    data class Completed(val runId: String, val message: String) : OrchestratorResult
-    data class Failed(val runId: String, val message: String) : OrchestratorResult
+    data class Completed(
+        val runId: String,
+        val message: String,
+        val outputs: List<lol.vynnra.agent.core.tool.ToolResult> = emptyList()
+    ) : OrchestratorResult
+    data class Failed(
+        val runId: String,
+        val message: String,
+        val outputs: List<lol.vynnra.agent.core.tool.ToolResult> = emptyList()
+    ) : OrchestratorResult
     data class Blocked(val runId: String, val missing: Set<lol.vynnra.agent.core.tool.Capability>) : OrchestratorResult
     data class Cancelled(val runId: String) : OrchestratorResult
 }
