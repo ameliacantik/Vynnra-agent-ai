@@ -72,11 +72,11 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [x] Permission-aware device actions
 
 ## Phase 6 — Vision
-- [ ] Screenshot pipeline
-- [ ] Visual understanding
-- [ ] Accessibility + vision fusion
-- [ ] Robust UI target resolution
-- [ ] Target verification
+- [x] Screenshot pipeline
+- [x] Visual understanding
+- [x] Accessibility + vision fusion
+- [x] Robust UI target resolution
+- [x] Target verification
 
 ## Phase 7 — Browser + Files
 - [ ] Chrome automation
@@ -153,16 +153,17 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest verified CI run for the screen-consent and screen-inspection implementation:
-- Workflow run: `35185995240`
-- Build job: `105088070634`
+Latest verified Phase 6 CI run:
+- Workflow run: `35189962543`
+- Build job: `105100145790`
+- Head commit: `a514b1fe475ab5678a05a0ea8c14b2850012a589`
 - Build result: **success**
 - Debug APK artifact: `vynnra-agent-debug-apk`
-- Artifact ID: `10482750500`
-- Artifact size: ~16.9 MB
-- Artifact SHA-256: `6ca3c55e06c8b64b59b6697ba7c964507ae70d8070506c370c3271149fad0deb`
+- Artifact ID: `10483223723`
+- Artifact size: 37,391,355 bytes (~37.4 MB)
+- Artifact SHA-256: `d220d7d45d3c2731f71e437bb800613a8e146a9f2a8e357f3631784e0412c18c`
 
-CI success verifies compilation and APK generation. Real-device runtime verification is still required before calling the entire Android-control stack production-ready.
+CI success verifies compilation and APK generation. Real-device runtime testing is still required for OEM-specific MediaProjection behavior, OCR model availability/download, and end-to-end gesture/target behavior.
 
 ## Vynnra Agent 1.0
 
