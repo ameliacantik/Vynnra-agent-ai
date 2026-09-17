@@ -9,9 +9,16 @@ import kotlinx.coroutines.ensureActive
 import java.util.UUID
 import lol.vynnra.agent.core.agent.AgentStatus
 import lol.vynnra.agent.core.agent.ThinkingLevel
+import lol.vynnra.agent.core.memory.MemoryRepositoryBridge
 import lol.vynnra.agent.core.security.CapabilityGate
 import lol.vynnra.agent.core.security.GateResult
+import lol.vynnra.agent.core.task.TaskRecord
+import lol.vynnra.agent.core.task.TaskStatus
+import lol.vynnra.agent.core.task.TaskStepRecord
+import lol.vynnra.agent.core.task.TaskStepStatus
 import lol.vynnra.agent.core.tool.ToolResultStatus
+import lol.vynnra.agent.data.memory.MemoryRepository
+import lol.vynnra.agent.data.task.TaskRepository
 
 class AgentOrchestrator(
     private val planner: AgentPlanner,
@@ -19,7 +26,10 @@ class AgentOrchestrator(
     private val capabilityGate: CapabilityGate,
     private val verifier: VerificationEngine = DefaultVerificationEngine(),
     private val recovery: RecoveryEngine = BoundedRecoveryEngine(),
-    private val journal: ActionJournal = ActionJournal()
+    private val journal: ActionJournal = ActionJournal(),
+    private val memoryRepository: MemoryRepository? = null,
+    private val taskRepository: TaskRepository? = null,
+    private val clock: () -> Long = System::currentTimeMillis
 ) {
     private val _state = MutableStateFlow(OrchestratorState())
     val state: StateFlow<OrchestratorState> = _state.asStateFlow()
@@ -30,27 +40,62 @@ class AgentOrchestrator(
     suspend fun run(goal: String, thinkingLevel: ThinkingLevel = ThinkingLevel.MAX): OrchestratorResult {
         stopRequested = false
         val runId = UUID.randomUUID().toString()
+        val taskId = UUID.randomUUID().toString()
+        val createdAt = clock()
+        var task = TaskRecord(
+            id = taskId,
+            title = goal.trim().take(80).ifBlank { "Vynnra task" },
+            goal = goal,
+            status = TaskStatus.PENDING,
+            currentStep = 0,
+            totalSteps = 0,
+            checkpointJson = "{\"runId\":\"$runId\",\"actionIndex\":0}",
+            lastError = null,
+            requiresUserAction = false,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+            completedAt = null
+        )
+
+        taskRepository?.create(task)
         update(runId, AgentStatus.UNDERSTANDING, "Understanding request")
 
         return try {
+            val relevantMemory = memoryRepository?.search(goal, limit = 8).orEmpty()
+            val planningGoal = MemoryRepositoryBridge.withContext(goal, relevantMemory)
+
             update(runId, AgentStatus.PLANNING, "Creating execution plan")
-            val plan = planner.createPlan(goal, thinkingLevel)
+            val plan = planner.createPlan(planningGoal, thinkingLevel).copy(runId = runId)
+            task = task.copy(
+                status = TaskStatus.RUNNING,
+                totalSteps = plan.actions.size,
+                updatedAt = clock()
+            )
+            taskRepository?.checkpoint(task, null)
 
             if (plan.actions.isEmpty()) {
                 update(runId, AgentStatus.COMPLETED, "No executable actions were produced")
+                taskRepository?.markCompleted(task.id, clock())
                 OrchestratorResult.Completed(runId, "Plan created; no tool actions required")
             } else {
-                executePlan(plan.copy(runId = runId))
+                executePlan(plan, task)
             }
         } catch (_: CancellationException) {
             update(runId, AgentStatus.CANCELLED, "Execution cancelled")
+            taskRepository?.updateStatus(task.id, TaskStatus.CANCELLED.name, "Execution cancelled")
             OrchestratorResult.Cancelled(runId)
         } catch (t: Throwable) {
             update(runId, AgentStatus.FAILED, "Execution failed")
             _state.value = _state.value.copy(error = t.message)
+            taskRepository?.updateStatus(task.id, TaskStatus.FAILED.name, t.message ?: "Unknown error")
             OrchestratorResult.Failed(runId, t.message ?: "Unknown error")
         }
     }
+
+    suspend fun resumePendingTasks(thinkingLevel: ThinkingLevel = ThinkingLevel.MAX): List<OrchestratorResult> =
+        taskRepository?.resumableTasks()
+            ?.map { task -> run(task.goal, thinkingLevel) }
+            .orEmpty()
 
     fun requestStop() {
         stopRequested = true
@@ -58,36 +103,82 @@ class AgentOrchestrator(
 
     fun journal(runId: String): List<ActionJournalEntry> = journal.forRun(runId)
 
-    private suspend fun executePlan(plan: AgentPlan): OrchestratorResult {
-        for (action in plan.actions) {
+    private suspend fun executePlan(plan: AgentPlan, initialTask: TaskRecord): OrchestratorResult {
+        var task = initialTask
+        for ((index, action) in plan.actions.withIndex()) {
             currentCoroutineContext().ensureActive()
             if (stopRequested) {
                 update(plan.runId, AgentStatus.CANCELLED, "Emergency stop requested")
+                taskRepository?.updateStatus(task.id, TaskStatus.CANCELLED.name, "Emergency stop requested")
                 return OrchestratorResult.Cancelled(plan.runId)
             }
 
             val tool = registry.get(action.toolId)
-                ?: return failBlocked(plan.runId, "Tool not registered: ${action.toolId}")
+                ?: return failTask(task, plan.runId, "Tool not registered: ${action.toolId}")
 
             when (val gate = capabilityGate.check(tool.definition.requiredCapabilities)) {
                 GateResult.Allowed -> Unit
                 is GateResult.Blocked -> {
                     update(plan.runId, AgentStatus.BLOCKED, "Missing capability: ${gate.missing.joinToString()}")
                     journal.record(plan.runId, action, "BLOCKED", "Missing capability")
+                    taskRepository?.checkpoint(
+                        task.copy(status = TaskStatus.BLOCKED, currentStep = index, updatedAt = clock(), requiresUserAction = true),
+                        TaskStepRecord(
+                            taskId = task.id,
+                            stepIndex = index,
+                            title = tool.definition.name,
+                            status = TaskStepStatus.BLOCKED,
+                            toolId = action.toolId,
+                            inputJson = action.input.toString(),
+                            outputSummary = null,
+                            attempts = 0,
+                            startedAt = null,
+                            completedAt = null,
+                            errorMessage = "Missing capability: ${gate.missing.joinToString()}"
+                        )
+                    )
                     return OrchestratorResult.Blocked(plan.runId, gate.missing)
                 }
             }
 
             update(plan.runId, AgentStatus.EXECUTING, "Executing ${tool.definition.name}")
+            val startedAt = clock()
             var attempt = 0
+            var lastResult = ToolResultStatus.FAILED
             while (true) {
                 currentCoroutineContext().ensureActive()
+                val runningTask = task.copy(
+                    status = TaskStatus.RUNNING,
+                    currentStep = index,
+                    updatedAt = clock(),
+                    checkpointJson = "{\"runId\":\"${plan.runId}\",\"actionIndex\":$index}"
+                )
+                val runningStep = TaskStepRecord(
+                    taskId = task.id,
+                    stepIndex = index,
+                    title = tool.definition.name,
+                    status = TaskStepStatus.RUNNING,
+                    toolId = action.toolId,
+                    inputJson = action.input.toString(),
+                    outputSummary = null,
+                    attempts = attempt,
+                    startedAt = startedAt,
+                    completedAt = null,
+                    errorMessage = null
+                )
+                taskRepository?.checkpoint(runningTask, runningStep)
                 journal.record(plan.runId, action, "STARTED")
+
                 val result = tool.execute(action.input)
+                lastResult = result.status
                 journal.record(plan.runId, action, result.status.name, result.message)
 
                 if (result.status == ToolResultStatus.CANCELLED || stopRequested) {
                     update(plan.runId, AgentStatus.CANCELLED, "Execution cancelled")
+                    taskRepository?.checkpoint(
+                        runningTask.copy(status = TaskStatus.CANCELLED, updatedAt = clock(), lastError = "Execution cancelled"),
+                        runningStep.copy(status = TaskStepStatus.CANCELLED, completedAt = clock(), attempts = attempt + 1, errorMessage = "Execution cancelled")
+                    )
                     return OrchestratorResult.Cancelled(plan.runId)
                 }
 
@@ -95,27 +186,51 @@ class AgentOrchestrator(
                     update(plan.runId, AgentStatus.VERIFYING, "Verifying ${tool.definition.name}")
                     val verification = verifier.verify(action, result)
                     if (verification.verified) {
+                        val verifiedAt = clock()
+                        task = runningTask.copy(currentStep = index + 1, updatedAt = verifiedAt, lastError = null)
+                        taskRepository?.checkpoint(
+                            task,
+                            runningStep.copy(
+                                status = TaskStepStatus.VERIFIED,
+                                completedAt = verifiedAt,
+                                attempts = attempt + 1,
+                                outputSummary = boundedSummary(result.message ?: verification.message)
+                            )
+                        )
                         break
                     }
                 } else if (result.status == ToolResultStatus.SUCCESS) {
+                    val verifiedAt = clock()
+                    task = runningTask.copy(currentStep = index + 1, updatedAt = verifiedAt, lastError = null)
+                    taskRepository?.checkpoint(
+                        task,
+                        runningStep.copy(
+                            status = TaskStepStatus.VERIFIED,
+                            completedAt = verifiedAt,
+                            attempts = attempt + 1,
+                            outputSummary = boundedSummary(result.message)
+                        )
+                    )
                     break
                 }
 
-                update(plan.runId, AgentStatus.RECOVERING, "Recovering from ${result.status.name}")
+                update(plan.runId, AgentStatus.RECOVERING, "Recovering from $lastResult")
                 val decision = recovery.decide(action, result.status, attempt)
                 if (!decision.retry) {
-                    return OrchestratorResult.Failed(plan.runId, decision.message)
+                    return failTask(task, plan.runId, decision.message)
                 }
                 attempt++
             }
         }
 
         update(plan.runId, AgentStatus.COMPLETED, "Task completed and verified")
+        taskRepository?.markCompleted(task.id, clock())
         return OrchestratorResult.Completed(plan.runId, "Task completed")
     }
 
-    private fun failBlocked(runId: String, message: String): OrchestratorResult {
-        update(runId, AgentStatus.BLOCKED, message)
+    private suspend fun failTask(task: TaskRecord, runId: String, message: String): OrchestratorResult {
+        update(runId, AgentStatus.FAILED, message)
+        taskRepository?.updateStatus(task.id, TaskStatus.FAILED.name, message)
         return OrchestratorResult.Failed(runId, message)
     }
 
@@ -127,6 +242,9 @@ class AgentOrchestrator(
             error = null
         )
     }
+
+    private fun boundedSummary(message: String?): String? =
+        message?.take(2_000)
 }
 
 data class OrchestratorState(
