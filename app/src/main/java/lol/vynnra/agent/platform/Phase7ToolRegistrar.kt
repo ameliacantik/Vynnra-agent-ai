@@ -9,88 +9,96 @@ object Phase7ToolRegistrar {
         val files = FileAgent(context)
 
         registry.register(ToolRegistry.adapter(BrowserOpenTool(browser)) { input ->
-            mapOf("url" to input.requiredString("url"))
+            BrowserOpenInput(url = input.requiredString("url"))
         })
         registry.register(ToolRegistry.adapter(BrowserSearchTool(browser)) { input ->
-            mapOf("query" to input.requiredString("query"))
+            BrowserSearchInput(query = input.requiredString("query"))
         })
         registry.register(ToolRegistry.adapter(BrowserBackTool(browser)) { Unit })
         registry.register(ToolRegistry.adapter(BrowserClickTextTool(browser)) { input ->
-            mapOf("text" to input.requiredString("text"))
+            BrowserTextInput(text = input.requiredString("text"))
         })
         registry.register(ToolRegistry.adapter(BrowserTypeTextTool(browser)) { input ->
-            mapOf("text" to input.requiredString("text"))
+            BrowserTextInput(text = input.requiredString("text"))
         })
         registry.register(ToolRegistry.adapter(BrowserScrollTool(browser)) { input ->
-            mapOf("direction" to (input["direction"] as? String ?: "down"))
+            BrowserScrollInput(direction = input["direction"] as? String ?: "down")
         })
         registry.register(ToolRegistry.adapter(BrowserExtractTool(browser)) { input ->
-            mapOf("maxItems" to (input["maxItems"] as? Number)?.toInt()?.coerceIn(1, 500) ?: 200)
+            BrowserExtractInput(
+                maxItems = (input["maxItems"] as? Number)?.toInt()?.coerceIn(1, 500) ?: 200
+            )
         })
         registry.register(ToolRegistry.adapter(BrowserDownloadTool(browser)) { input ->
-            mapOf("url" to input.requiredString("url"), "fileName" to input["fileName"] as? String)
+            BrowserDownloadInput(
+                url = input.requiredString("url"),
+                fileName = input["fileName"] as? String
+            )
         })
         registry.register(ToolRegistry.adapter(BrowserUploadTool(browser)) { Unit })
         registry.register(ToolRegistry.adapter(NativeBrowserOpenTool(context)) { input ->
-            mapOf("url" to (input["url"] as? String))
+            NativeBrowserOpenInput(url = input["url"] as? String)
         })
 
         registry.register(ToolRegistry.adapter(FileListTool(files)) { input ->
-            mapOf(
-                "path" to input.requiredString("path"),
-                "recursive" to (input["recursive"] as? Boolean ?: false),
-                "maxEntries" to (input["maxEntries"] as? Number)?.toInt()?.coerceIn(1, 2000) ?: 500
+            FileListInput(
+                path = input.requiredString("path"),
+                recursive = input["recursive"] as? Boolean ?: false,
+                maxEntries = (input["maxEntries"] as? Number)?.toInt()?.coerceIn(1, 2000) ?: 500
             )
         })
         registry.register(ToolRegistry.adapter(FileReadTool(files)) { input ->
-            mapOf("path" to input.requiredString("path"), "maxBytes" to (input["maxBytes"] as? Number)?.toInt() ?: 2_000_000)
+            FileReadInput(
+                path = input.requiredString("path"),
+                maxBytes = (input["maxBytes"] as? Number)?.toInt()?.coerceAtLeast(1) ?: 2_000_000
+            )
         })
         registry.register(ToolRegistry.adapter(FileWriteTool(files)) { input ->
-            mapOf(
-                "path" to input.requiredString("path"),
-                "text" to input["text"].requiredStringValue("text"),
-                "overwrite" to (input["overwrite"] as? Boolean ?: true),
-                "confirmed" to (input["confirmed"] as? Boolean ?: false)
+            FileWriteInput(
+                path = input.requiredString("path"),
+                text = input.requiredString("text"),
+                overwrite = input["overwrite"] as? Boolean ?: true,
+                confirmed = input["confirmed"] as? Boolean ?: false
             )
         })
         registry.register(ToolRegistry.adapter(FileCopyTool(files)) { input ->
-            mapOf(
-                "source" to input.requiredString("source"),
-                "destination" to input.requiredString("destination"),
-                "overwrite" to (input["overwrite"] as? Boolean ?: false),
-                "confirmed" to (input["confirmed"] as? Boolean ?: false)
+            FileCopyInput(
+                source = input.requiredString("source"),
+                destination = input.requiredString("destination"),
+                overwrite = input["overwrite"] as? Boolean ?: false,
+                confirmed = input["confirmed"] as? Boolean ?: false
             )
         })
         registry.register(ToolRegistry.adapter(FileMoveTool(files)) { input ->
-            mapOf(
-                "source" to input.requiredString("source"),
-                "destination" to input.requiredString("destination"),
-                "overwrite" to (input["overwrite"] as? Boolean ?: false),
-                "confirmed" to (input["confirmed"] as? Boolean ?: false)
+            FileMoveInput(
+                source = input.requiredString("source"),
+                destination = input.requiredString("destination"),
+                overwrite = input["overwrite"] as? Boolean ?: false,
+                confirmed = input["confirmed"] as? Boolean ?: false
             )
         })
         registry.register(ToolRegistry.adapter(FileDeleteTool(files)) { input ->
-            mapOf("path" to input.requiredString("path"), "confirmed" to (input["confirmed"] as? Boolean ?: false))
+            FileDeleteInput(
+                path = input.requiredString("path"),
+                confirmed = input["confirmed"] as? Boolean ?: false
+            )
         })
         registry.register(ToolRegistry.adapter(FileSearchTool(files)) { input ->
-            mapOf(
-                "root" to input.requiredString("root"),
-                "query" to input.requiredString("query"),
-                "maxResults" to (input["maxResults"] as? Number)?.toInt()?.coerceIn(1, 500) ?: 100
+            FileSearchInput(
+                root = input.requiredString("root"),
+                query = input.requiredString("query"),
+                maxResults = (input["maxResults"] as? Number)?.toInt()?.coerceIn(1, 500) ?: 100
             )
         })
         registry.register(ToolRegistry.adapter(FileAccessStatusTool(files)) { Unit })
         registry.register(ToolRegistry.adapter(FileBulkDeleteTool(files)) { input ->
-            mapOf(
-                "paths" to (input["paths"] as? List<*>)?.filterIsInstance<String>() ?: emptyList<String>(),
-                "confirmed" to (input["confirmed"] as? Boolean ?: false)
+            FileBulkDeleteInput(
+                paths = (input["paths"] as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                confirmed = input["confirmed"] as? Boolean ?: false
             )
         })
     }
 
     private fun Map<String, Any?>.requiredString(key: String): String =
         (this[key] as? String)?.takeIf { it.isNotBlank() } ?: error("Missing or blank input: $key")
-
-    private fun Any?.requiredStringValue(key: String): String =
-        (this as? String)?.takeIf { it.isNotBlank() } ?: error("Missing or blank input: $key")
 }
