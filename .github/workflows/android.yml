@@ -36,15 +36,16 @@ jobs:
       - name: Run Android restart instrumentation test
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 30
-          target: default
-          arch: x86
+          api-level: 35
+          target: google_apis
+          arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           disable-animations: true
           script: timeout 300s gradle connectedDebugAndroidTest --stacktrace --no-daemon --console=plain
 
       - name: Upload APK
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: vynnra-agent-debug-apk
