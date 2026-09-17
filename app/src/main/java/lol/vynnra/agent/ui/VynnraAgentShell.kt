@@ -53,8 +53,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import lol.vynnra.agent.core.agent.ThinkingLevel
+import lol.vynnra.agent.core.provider.ProviderConfig
+import lol.vynnra.agent.core.voice.VoiceAgentUiState
 import lol.vynnra.agent.data.memory.MemoryRepository
 import lol.vynnra.agent.data.task.TaskRepository
 import lol.vynnra.agent.platform.VoiceStatus
@@ -79,10 +82,14 @@ fun VynnraAgentShell(
     onRequestScreenCapture: () -> Unit,
     microphoneGranted: Boolean,
     voiceState: VoiceUiState,
+    voiceAgentState: VoiceAgentUiState,
+    providerConfig: ProviderConfig,
     onRequestMicrophone: () -> Unit,
     onStartVoice: () -> Unit,
     onStopVoice: () -> Unit,
-    onStopSpeaking: () -> Unit
+    onStopSpeaking: () -> Unit,
+    onSendMessage: (String, ThinkingLevel, Boolean) -> Unit,
+    onSaveProviderConfig: (ProviderConfig) -> Unit
 ) {
     var drawerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
@@ -94,8 +101,23 @@ fun VynnraAgentShell(
     val sessions = remember { mutableStateListOf(AgentSession(1, "New Chat")) }
     val messages = remember { mutableStateListOf<AgentMessage>() }
 
+    var providerBaseUrl by remember(providerConfig.baseUrl) { mutableStateOf(providerConfig.baseUrl) }
+    var providerApiKey by remember { mutableStateOf("") }
+    var providerModel by remember(providerConfig.model) { mutableStateOf(providerConfig.model) }
+
     LaunchedEffect(voiceState.finalText) {
-        if (voiceState.finalText.isNotBlank()) message = voiceState.finalText
+        val transcript = voiceState.finalText.trim()
+        if (transcript.isNotEmpty()) {
+            message = transcript
+            onSendMessage(transcript, thinkingLevel, true)
+        }
+    }
+
+    LaunchedEffect(voiceAgentState.replyId) {
+        val reply = voiceAgentState.reply
+        if (voiceAgentState.replyId != 0L && !reply.isNullOrBlank()) {
+            messages += AgentMessage(AgentMessageRole.ASSISTANT, reply)
+        }
     }
 
     Box(Modifier.fillMaxSize().background(VynnraBlack)) {
@@ -106,7 +128,7 @@ fun VynnraAgentShell(
                 onMenu = { drawerOpen = true },
                 onThinkingChange = { thinkingLevel = it }
             )
-            StatusStrip(voiceState)
+            StatusStrip(voiceState = voiceState, agentState = voiceAgentState)
             MessageArea(messages, Modifier.weight(1f))
 
             if (voiceState.partialText.isNotBlank()) {
@@ -125,6 +147,13 @@ fun VynnraAgentShell(
             if (voiceState.errorMessage != null) {
                 Text(
                     voiceState.errorMessage,
+                    color = VynnraMuted,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 3.dp)
+                )
+            }
+            if (voiceAgentState.error != null) {
+                Text(
+                    voiceAgentState.error,
                     color = VynnraMuted,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 3.dp)
                 )
@@ -161,9 +190,10 @@ fun VynnraAgentShell(
                 }
                 IconButton(onClick = {
                     val trimmed = message.trim()
-                    if (trimmed.isNotEmpty()) {
+                    if (trimmed.isNotEmpty() && !voiceAgentState.busy) {
                         messages += AgentMessage(AgentMessageRole.USER, trimmed)
                         message = ""
+                        onSendMessage(trimmed, thinkingLevel, false)
                     }
                 }) {
                     Icon(Icons.Outlined.Send, contentDescription = "Send", tint = VynnraPurple)
@@ -199,7 +229,54 @@ fun VynnraAgentShell(
                 SettingRow("Appearance", "AMOLED / Dark", Icons.Outlined.AutoAwesome)
                 SettingRow("Thinking", thinkingLevel.name, Icons.Outlined.AutoAwesome)
                 SettingRow("Voice", voiceState.status.name, Icons.Outlined.Mic)
-                Button(onClick = { settingsOpen = false }) { Text("Done") }
+                Spacer(Modifier.height(8.dp))
+                Text("AI Provider", color = VynnraText, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = providerBaseUrl,
+                    onValueChange = { providerBaseUrl = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Base URL") },
+                    singleLine = true
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = providerApiKey,
+                    onValueChange = { providerApiKey = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("API key (leave blank to keep saved key)") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                Spacer(Modifier.height(6.dp))
+                OutlinedTextField(
+                    value = providerModel,
+                    onValueChange = { providerModel = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Model") },
+                    singleLine = true
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    if (providerConfig.isConfigured()) "Provider configured" else "Provider not configured",
+                    color = if (providerConfig.isConfigured()) VynnraPurpleSoft else VynnraMuted
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    Button(onClick = {
+                        val key = providerApiKey.trim().ifBlank { providerConfig.apiKey }
+                        onSaveProviderConfig(
+                            ProviderConfig(
+                                baseUrl = providerBaseUrl,
+                                apiKey = key,
+                                model = providerModel
+                            )
+                        )
+                        providerApiKey = ""
+                    }) { Text("Save provider") }
+                    Spacer(Modifier.width(8.dp))
+                    Button(onClick = { settingsOpen = false }) { Text("Done") }
+                }
             }
         }
 
@@ -255,13 +332,15 @@ private fun ThinkingSelector(selected: ThinkingLevel, onSelected: (ThinkingLevel
 }
 
 @Composable
-private fun StatusStrip(voiceState: VoiceUiState) {
-    val statusText = when (voiceState.status) {
-        VoiceStatus.LISTENING -> "Listening — speak naturally"
-        VoiceStatus.SPEAKING -> "Speaking — Vynnra is reading the response"
-        VoiceStatus.ERROR -> "Voice error — ${voiceState.errorMessage ?: "check permissions"}"
-        VoiceStatus.UNSUPPORTED -> "Voice unavailable on this device"
-        VoiceStatus.IDLE -> "Ready — memory, tasks, and voice enabled"
+private fun StatusStrip(voiceState: VoiceUiState, agentState: VoiceAgentUiState) {
+    val statusText = when {
+        voiceState.status == VoiceStatus.LISTENING -> "Listening — speak naturally"
+        voiceState.status == VoiceStatus.SPEAKING -> "Speaking — Vynnra is reading the response"
+        agentState.busy -> "Thinking — processing your request"
+        agentState.error != null -> "AI error — check provider settings"
+        voiceState.status == VoiceStatus.ERROR -> "Voice error — ${voiceState.errorMessage ?: "check permissions"}"
+        voiceState.status == VoiceStatus.UNSUPPORTED -> "Voice unavailable on this device"
+        else -> "Ready — memory, tasks, voice, and AI provider enabled"
     }
     Surface(color = VynnraPanel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -354,7 +433,7 @@ private fun DrawerAction(label: String, icon: androidx.compose.ui.graphics.vecto
 @Composable
 private fun ModalPanel(title: String, onClose: () -> Unit, content: @Composable () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)), contentAlignment = Alignment.Center) {
-        Surface(color = VynnraPanel, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(0.88f)) {
+        Surface(color = VynnraPanel, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth(0.92f)) {
             Column(Modifier.padding(20.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(title, color = VynnraText, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
@@ -376,13 +455,5 @@ private fun SettingRow(title: String, value: String, icon: androidx.compose.ui.g
             Text(title, color = VynnraText)
             Text(value, color = VynnraMuted)
         }
-    }
-}
-
-@Composable
-private fun PermissionLine(label: String, granted: Boolean) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = VynnraText, modifier = Modifier.weight(1f))
-        Text(if (granted) "Granted" else "Not granted", color = if (granted) VynnraPurple else VynnraMuted)
     }
 }
