@@ -89,18 +89,30 @@ Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial
 - [x] Bulk file operations with confirmation gates
 
 ## Phase 8 — Tavily Web Search
-- [ ] Server-side web search
-- [ ] Tavily integration
-- [ ] Research workflows
-- [ ] Source/citation handling
-- [ ] Secret-safe API configuration
+- [x] Server-side web search foundation
+- [x] Tavily integration
+- [x] Bounded research workflows
+- [x] Source/citation handling foundation
+- [x] Secret-safe API configuration
+- [~] Android-to-backend runtime integration
+- [~] Citation rendering in production chat UI
+- [ ] Production backend deployment and health verification
+- [ ] End-to-end Android → backend → Tavily → chat verification
 
 ## Phase 9 — Memory + Tasks
-- [ ] Conversation memory
-- [ ] Long-term memory
-- [ ] Persistent tasks
-- [ ] Task state/resume after restart
-- [ ] User-controlled memory management
+- [~] Room schema v2 for memory and persistent tasks
+- [~] Conversation memory with bounded recent-message retrieval
+- [~] Long-term memory with relevance scoring
+- [~] User-controlled memory management
+- [~] Persistent task records and task steps
+- [~] Task lifecycle and checkpointing
+- [~] Resumable task discovery after restart
+- [~] Application-scoped memory/task repositories
+- [~] Unit coverage for memory relevance and task resume behavior
+- [ ] Chat UI memory controls
+- [ ] Task UI and task detail timeline
+- [ ] Full orchestrator integration for automatic task checkpointing
+- [ ] End-to-end process/device restart verification
 
 ## Phase 10 — Voice
 - [ ] Speech-to-text
@@ -153,17 +165,17 @@ The UI must always display the active storage level and the exact capability sta
 
 ## Build Verification
 
-Latest verified Phase 7 CI run:
-- Workflow run: `35191428977`
-- Build job: `105104644185`
-- Head commit: `41cd58344fa8c57a54dd37c6f188e5ecb63384fa`
+Latest fully verified CI checkpoint before Phase 9 work:
+- Workflow run: `35192201354`
+- Build job: `105107062337`
+- Head commit: `e158e62e8b4c5f02089b1f9e946e2d3b8404d2ab`
 - Build result: **success**
 - Debug APK artifact: `vynnra-agent-debug-apk`
-- Artifact ID: `10482934778`
-- Artifact size: 37,426,255 bytes (~37.4 MB)
-- Artifact SHA-256: `f40cd4647e22b35ca1a12bb2ea48085079ef373770ecf3675777ed793e3fe8c6`
+- Artifact ID: `10484980571`
+- Artifact size: 37,447,990 bytes
+- Artifact SHA-256: `ac32fac55e7ff1fac710f498b5e6a5e947d716f66f3a4717b929ab655c674942`
 
-CI success verifies compilation and APK generation. Real-device runtime testing is still required for Chrome UI behavior, AI-native browser behavior, Android DocumentsUI/upload handoff, DownloadManager/OEM behavior, and end-to-end browser/file workflows.
+Current Phase 9 verification run is tracked separately. Phase 9 checklist items remain `[~]` until the new implementation has passed CI/build verification. Real-device runtime testing is still required for restart behavior and the unfinished Phase 8/9 end-to-end boundaries.
 
 ## Vynnra Agent 1.0
 
