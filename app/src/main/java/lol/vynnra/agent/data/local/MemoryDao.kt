@@ -12,6 +12,9 @@ interface MemoryDao {
     @Query("SELECT * FROM memories WHERE enabled = 1 ORDER BY pinned DESC, importance DESC, updatedAt DESC")
     fun observeEnabled(): Flow<List<MemoryEntity>>
 
+    @Query("SELECT * FROM memories ORDER BY pinned DESC, enabled DESC, importance DESC, updatedAt DESC")
+    fun observeAll(): Flow<List<MemoryEntity>>
+
     @Query(
         "SELECT * FROM memories " +
             "WHERE enabled = 1 AND (content LIKE '%' || :query || '%' OR key LIKE '%' || :query || '%') " +
