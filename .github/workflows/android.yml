@@ -30,6 +30,18 @@ jobs:
       - name: Build debug APK
         run: gradle assembleDebug --stacktrace
 
+      - name: Run JVM unit tests
+        run: gradle testDebugUnitTest --stacktrace
+
+      - name: Run Android restart instrumentation test
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: gradle connectedDebugAndroidTest --stacktrace
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
