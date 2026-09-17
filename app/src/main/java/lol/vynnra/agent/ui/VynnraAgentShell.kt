@@ -26,8 +26,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddComment
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Close
-import androidx.compose.material.icons.outlined.Menu
 import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.Mic
+import androidx.compose.material.icons.outlined.MicOff
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material.icons.outlined.Settings
@@ -41,6 +43,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
@@ -54,6 +57,8 @@ import androidx.compose.ui.unit.dp
 import lol.vynnra.agent.core.agent.ThinkingLevel
 import lol.vynnra.agent.data.memory.MemoryRepository
 import lol.vynnra.agent.data.task.TaskRepository
+import lol.vynnra.agent.platform.VoiceStatus
+import lol.vynnra.agent.platform.VoiceUiState
 import lol.vynnra.agent.ui.theme.VynnraBlack
 import lol.vynnra.agent.ui.theme.VynnraMuted
 import lol.vynnra.agent.ui.theme.VynnraPanel
@@ -71,7 +76,13 @@ fun VynnraAgentShell(
     memoryRepository: MemoryRepository,
     taskRepository: TaskRepository,
     screenCaptureGranted: Boolean,
-    onRequestScreenCapture: () -> Unit
+    onRequestScreenCapture: () -> Unit,
+    microphoneGranted: Boolean,
+    voiceState: VoiceUiState,
+    onRequestMicrophone: () -> Unit,
+    onStartVoice: () -> Unit,
+    onStopVoice: () -> Unit,
+    onStopSpeaking: () -> Unit
 ) {
     var drawerOpen by remember { mutableStateOf(false) }
     var settingsOpen by remember { mutableStateOf(false) }
@@ -83,6 +94,10 @@ fun VynnraAgentShell(
     val sessions = remember { mutableStateListOf(AgentSession(1, "New Chat")) }
     val messages = remember { mutableStateListOf<AgentMessage>() }
 
+    LaunchedEffect(voiceState.finalText) {
+        if (voiceState.finalText.isNotBlank()) message = voiceState.finalText
+    }
+
     Box(Modifier.fillMaxSize().background(VynnraBlack)) {
         Column(Modifier.fillMaxSize()) {
             TopBar(
@@ -91,8 +106,30 @@ fun VynnraAgentShell(
                 onMenu = { drawerOpen = true },
                 onThinkingChange = { thinkingLevel = it }
             )
-            StatusStrip()
+            StatusStrip(voiceState)
             MessageArea(messages, Modifier.weight(1f))
+
+            if (voiceState.partialText.isNotBlank()) {
+                Surface(
+                    color = VynnraPanelElevated,
+                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        "Listening: ${voiceState.partialText}",
+                        color = VynnraMuted,
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            if (voiceState.errorMessage != null) {
+                Text(
+                    voiceState.errorMessage,
+                    color = VynnraMuted,
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 3.dp)
+                )
+            }
+
             Row(
                 Modifier.fillMaxWidth().navigationBarsPadding().padding(12.dp),
                 verticalAlignment = Alignment.Bottom
@@ -105,7 +142,21 @@ fun VynnraAgentShell(
                     shape = RoundedCornerShape(22.dp),
                     maxLines = 5
                 )
-                IconButton(onClick = { messages += AgentMessage(AgentMessageRole.ASSISTANT, "Agent execution is connected to the Phase 9 persistence layer.") }) {
+                IconButton(onClick = {
+                    when {
+                        voiceState.status == VoiceStatus.LISTENING -> onStopVoice()
+                        voiceState.status == VoiceStatus.SPEAKING -> onStopSpeaking()
+                        !microphoneGranted -> onRequestMicrophone()
+                        else -> onStartVoice()
+                    }
+                }) {
+                    Icon(
+                        imageVector = if (voiceState.status == VoiceStatus.LISTENING) Icons.Outlined.MicOff else Icons.Outlined.Mic,
+                        contentDescription = if (voiceState.status == VoiceStatus.LISTENING) "Stop voice input" else "Voice input",
+                        tint = if (voiceState.status == VoiceStatus.LISTENING) VynnraPurple else VynnraMuted
+                    )
+                }
+                IconButton(onClick = { messages += AgentMessage(AgentMessageRole.ASSISTANT, "Emergency stop is available from the agent controller.") }) {
                     Icon(Icons.Outlined.StopCircle, contentDescription = "Stop agent", tint = VynnraMuted)
                 }
                 IconButton(onClick = {
@@ -147,6 +198,7 @@ fun VynnraAgentShell(
             ModalPanel("Settings", { settingsOpen = false }) {
                 SettingRow("Appearance", "AMOLED / Dark", Icons.Outlined.AutoAwesome)
                 SettingRow("Thinking", thinkingLevel.name, Icons.Outlined.AutoAwesome)
+                SettingRow("Voice", voiceState.status.name, Icons.Outlined.Mic)
                 Button(onClick = { settingsOpen = false }) { Text("Done") }
             }
         }
@@ -160,7 +212,10 @@ fun VynnraAgentShell(
                 PermissionLine("Accessibility Control", false)
                 PermissionLine("Files", false)
                 PermissionLine("Overlay", false)
-                PermissionLine("Microphone", false)
+                PermissionLine("Microphone", microphoneGranted)
+                if (!microphoneGranted) {
+                    Button(onClick = onRequestMicrophone, modifier = Modifier.fillMaxWidth()) { Text("Grant Microphone") }
+                }
                 Spacer(Modifier.height(8.dp))
                 Text("Capabilities remain user-controlled by Android.", color = VynnraMuted)
             }
@@ -200,12 +255,19 @@ private fun ThinkingSelector(selected: ThinkingLevel, onSelected: (ThinkingLevel
 }
 
 @Composable
-private fun StatusStrip() {
+private fun StatusStrip(voiceState: VoiceUiState) {
+    val statusText = when (voiceState.status) {
+        VoiceStatus.LISTENING -> "Listening — speak naturally"
+        VoiceStatus.SPEAKING -> "Speaking — Vynnra is reading the response"
+        VoiceStatus.ERROR -> "Voice error — ${voiceState.errorMessage ?: "check permissions"}"
+        VoiceStatus.UNSUPPORTED -> "Voice unavailable on this device"
+        VoiceStatus.IDLE -> "Ready — memory, tasks, and voice enabled"
+    }
     Surface(color = VynnraPanel, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp)) {
         Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
             Surface(color = VynnraPurple.copy(alpha = 0.18f), shape = CircleShape, modifier = Modifier.size(8.dp)) {}
             Spacer(Modifier.width(8.dp))
-            Text("Ready — memory and persistent tasks enabled", color = VynnraMuted)
+            Text(statusText, color = VynnraMuted)
         }
     }
 }
@@ -220,7 +282,7 @@ private fun MessageArea(messages: List<AgentMessage>, modifier: Modifier) {
                 }
                 Spacer(Modifier.height(14.dp))
                 Text("How can Vynnra help?", color = VynnraText, fontWeight = FontWeight.Bold)
-                Text("Ask, plan, research, or control your Android device.", color = VynnraMuted)
+                Text("Ask, plan, research, control Android, or speak to Vynnra.", color = VynnraMuted)
             }
         }
     } else {
