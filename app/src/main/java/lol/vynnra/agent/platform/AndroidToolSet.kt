@@ -6,6 +6,11 @@ import lol.vynnra.agent.core.tool.ToolResult
 import lol.vynnra.agent.core.tool.ToolResultStatus
 import lol.vynnra.agent.core.tool.VynnraTool
 
+private val ACCESSIBILITY_AND_INTERACTION = setOf(
+    Capability.ACCESSIBILITY_CONTROL,
+    Capability.SCREEN_INTERACT
+)
+
 private fun AndroidControlResult.toToolResult(): ToolResult = ToolResult(
     status = if (success) ToolResultStatus.SUCCESS else ToolResultStatus.FAILED,
     message = message,
@@ -13,46 +18,22 @@ private fun AndroidControlResult.toToolResult(): ToolResult = ToolResult(
 )
 
 class AndroidBackTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition(
-        id = "android.back",
-        name = "Android Back",
-        description = "Press the Android Back action.",
-        riskLevel = RiskLevel.LOW
-    )
-
+    override val definition = toolDefinition("android.back", "Android Back", "Press the Android Back action.")
     override suspend fun execute(input: Unit): ToolResult = controller.back().toToolResult()
 }
 
 class AndroidHomeTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition(
-        id = "android.home",
-        name = "Android Home",
-        description = "Go to the Android Home screen.",
-        riskLevel = RiskLevel.LOW
-    )
-
+    override val definition = toolDefinition("android.home", "Android Home", "Go to the Android Home screen.")
     override suspend fun execute(input: Unit): ToolResult = controller.home().toToolResult()
 }
 
 class AndroidRecentsTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition(
-        id = "android.recents",
-        name = "Android Recents",
-        description = "Open the Android recent-apps screen.",
-        riskLevel = RiskLevel.LOW
-    )
-
+    override val definition = toolDefinition("android.recents", "Android Recents", "Open the Android recent-apps screen.")
     override suspend fun execute(input: Unit): ToolResult = controller.recents().toToolResult()
 }
 
 class AndroidNotificationsTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition(
-        id = "android.notifications",
-        name = "Android Notifications",
-        description = "Open the Android notification shade.",
-        riskLevel = RiskLevel.LOW
-    )
-
+    override val definition = toolDefinition("android.notifications", "Android Notifications", "Open the Android notification shade.")
     override suspend fun execute(input: Unit): ToolResult = controller.notifications().toToolResult()
 }
 
@@ -66,16 +47,10 @@ class AndroidLaunchAppTool(private val controller: AndroidController) : VynnraTo
         riskLevel = RiskLevel.MEDIUM,
         supportsVerification = true
     )
-
-    override suspend fun execute(input: LaunchAppInput): ToolResult =
-        controller.launchPackage(input.packageName).toToolResult()
+    override suspend fun execute(input: LaunchAppInput): ToolResult = controller.launchPackage(input.packageName).toToolResult()
 }
 
-data class TapInput(
-    val x: Float,
-    val y: Float,
-    val expectedText: String? = null
-)
+data class TapInput(val x: Float, val y: Float, val expectedText: String? = null)
 
 class AndroidTapTool(private val controller: AndroidController) : VynnraTool<TapInput> {
     override val definition = toolDefinition(
@@ -85,9 +60,7 @@ class AndroidTapTool(private val controller: AndroidController) : VynnraTool<Tap
         riskLevel = RiskLevel.MEDIUM,
         supportsVerification = true
     )
-
-    override suspend fun execute(input: TapInput): ToolResult =
-        controller.tap(input.x, input.y).toToolResult().withExpectedText(input.expectedText)
+    override suspend fun execute(input: TapInput): ToolResult = controller.tap(input.x, input.y).toToolResult().withExpectedText(input.expectedText)
 }
 
 data class SwipeInput(
@@ -107,15 +80,9 @@ class AndroidSwipeTool(private val controller: AndroidController) : VynnraTool<S
         riskLevel = RiskLevel.MEDIUM,
         supportsVerification = true
     )
-
-    override suspend fun execute(input: SwipeInput): ToolResult =
-        controller.swipe(
-            input.startX,
-            input.startY,
-            input.endX,
-            input.endY,
-            input.durationMs
-        ).toToolResult().withExpectedText(input.expectedText)
+    override suspend fun execute(input: SwipeInput): ToolResult = controller.swipe(
+        input.startX, input.startY, input.endX, input.endY, input.durationMs
+    ).toToolResult().withExpectedText(input.expectedText)
 }
 
 data class TypeTextInput(val text: String, val expectedText: String? = null)
@@ -125,11 +92,10 @@ class AndroidTypeTextTool(private val controller: AndroidController) : VynnraToo
         id = "android.type_text",
         name = "Type Text",
         description = "Enter text into the focused or editable Accessibility node.",
-        requiredCapabilities = setOf(Capability.SCREEN_INTERACT),
+        requiredCapabilities = ACCESSIBILITY_AND_INTERACTION,
         riskLevel = RiskLevel.MEDIUM,
         supportsVerification = true
     )
-
     override suspend fun execute(input: TypeTextInput): ToolResult =
         controller.typeText(input.text).toToolResult().withExpectedText(input.expectedText ?: input.text)
 }
@@ -141,11 +107,10 @@ class AndroidClickTextTool(private val controller: AndroidController) : VynnraTo
         id = "android.click_text",
         name = "Click Text",
         description = "Find visible text in the Accessibility tree and click its nearest clickable parent.",
-        requiredCapabilities = setOf(Capability.SCREEN_INTERACT),
+        requiredCapabilities = ACCESSIBILITY_AND_INTERACTION,
         riskLevel = RiskLevel.MEDIUM,
         supportsVerification = true
     )
-
     override suspend fun execute(input: ClickTextInput): ToolResult =
         controller.clickText(input.text).toToolResult().withExpectedText(input.expectedText)
 }
@@ -157,11 +122,10 @@ class AndroidFindTextTool(private val controller: AndroidController) : VynnraToo
         id = "android.find_text",
         name = "Find Text",
         description = "Inspect the active Accessibility tree for visible matching text.",
-        requiredCapabilities = setOf(Capability.SCREEN_INTERACT),
+        requiredCapabilities = setOf(Capability.ACCESSIBILITY_CONTROL),
         riskLevel = RiskLevel.LOW,
         supportsVerification = true
     )
-
     override suspend fun execute(input: FindTextInput): ToolResult {
         val matches = controller.findText(input.text)
         return ToolResult(
@@ -169,12 +133,9 @@ class AndroidFindTextTool(private val controller: AndroidController) : VynnraToo
             message = if (matches.isNotEmpty()) "Found ${matches.size} matching element(s)" else "Text not found: ${input.text}",
             data = mapOf(
                 "query" to input.text,
-                "matches" to matches.map { mapOf(
-                    "text" to it.text,
-                    "className" to it.className,
-                    "clickable" to it.clickable,
-                    "editable" to it.editable
-                ) }
+                "matches" to matches.map {
+                    mapOf("text" to it.text, "className" to it.className, "clickable" to it.clickable, "editable" to it.editable)
+                }
             )
         )
     }
@@ -197,5 +158,4 @@ private fun toolDefinition(
 )
 
 private fun ToolResult.withExpectedText(expectedText: String?): ToolResult =
-    if (expectedText.isNullOrBlank()) this
-    else copy(data = data + ("expectedText" to expectedText))
+    if (expectedText.isNullOrBlank()) this else copy(data = data + ("expectedText" to expectedText))
