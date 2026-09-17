@@ -91,6 +91,7 @@ Tool catalog:
                 add(AgentAction(id = id, toolId = toolId, input = input, requiresVerification = verify))
             }
         }
+        if (actions.isEmpty()) return fallbackPlan(goal, thinkingLevel)
         return AgentPlan(
             runId = UUID.randomUUID().toString(),
             goal = goal,
