@@ -60,10 +60,7 @@ class AiAgentPlanner(
                         {"actions":[
                           {"id":"a1","tool":"tool.id","input":{},"verify":true}
                         ]}
-                        """.trimIndent() + "
-
-Tool catalog:
-" + toolCatalog()
+                        """.trimIndent() + "\n\nTool catalog:\n" + toolCatalog()
                     ),
                     AiMessage(AiMessage.Role.USER, goal.trim())
                 )
