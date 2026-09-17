@@ -40,32 +40,12 @@ class AgentOrchestrator(
     suspend fun run(goal: String, thinkingLevel: ThinkingLevel = ThinkingLevel.MAX): OrchestratorResult {
         stopRequested = false
         val runId = UUID.randomUUID().toString()
-        val taskId = UUID.randomUUID().toString()
-        val createdAt = clock()
-        var task = TaskRecord(
-            id = taskId,
-            title = goal.trim().take(80).ifBlank { "Vynnra task" },
-            goal = goal,
-            status = TaskStatus.PENDING,
-            currentStep = 0,
-            totalSteps = 0,
-            checkpointJson = "{\"runId\":\"$runId\",\"actionIndex\":0}",
-            lastError = null,
-            requiresUserAction = false,
-            createdAt = createdAt,
-            updatedAt = createdAt,
-            completedAt = null
-        )
-
+        var task = createTask(goal, runId)
         taskRepository?.create(task)
         update(runId, AgentStatus.UNDERSTANDING, "Understanding request")
 
         return try {
-            val relevantMemory = memoryRepository?.search(goal, limit = 8).orEmpty()
-            val planningGoal = MemoryRepositoryBridge.withContext(goal, relevantMemory)
-
-            update(runId, AgentStatus.PLANNING, "Creating execution plan")
-            val plan = planner.createPlan(planningGoal, thinkingLevel).copy(runId = runId)
+            val plan = createPlan(goal, thinkingLevel, runId)
             task = task.copy(
                 status = TaskStatus.RUNNING,
                 totalSteps = plan.actions.size,
@@ -78,7 +58,7 @@ class AgentOrchestrator(
                 taskRepository?.markCompleted(task.id, clock())
                 OrchestratorResult.Completed(runId, "Plan created; no tool actions required")
             } else {
-                executePlan(plan, task)
+                executePlan(plan, task, startIndex = 0)
             }
         } catch (_: CancellationException) {
             update(runId, AgentStatus.CANCELLED, "Execution cancelled")
@@ -93,9 +73,7 @@ class AgentOrchestrator(
     }
 
     suspend fun resumePendingTasks(thinkingLevel: ThinkingLevel = ThinkingLevel.MAX): List<OrchestratorResult> =
-        taskRepository?.resumableTasks()
-            ?.map { task -> run(task.goal, thinkingLevel) }
-            .orEmpty()
+        taskRepository?.resumableTasks()?.map { task -> resumeTask(task, thinkingLevel) }.orEmpty()
 
     fun requestStop() {
         stopRequested = true
@@ -103,9 +81,75 @@ class AgentOrchestrator(
 
     fun journal(runId: String): List<ActionJournalEntry> = journal.forRun(runId)
 
-    private suspend fun executePlan(plan: AgentPlan, initialTask: TaskRecord): OrchestratorResult {
+    private suspend fun resumeTask(task: TaskRecord, thinkingLevel: ThinkingLevel): OrchestratorResult {
+        stopRequested = false
+        val runId = UUID.randomUUID().toString()
+        update(runId, AgentStatus.UNDERSTANDING, "Resuming persisted task")
+        return try {
+            val plan = createPlan(task.goal, thinkingLevel, runId)
+            val startIndex = task.currentStep.coerceIn(0, plan.actions.size)
+            val resumed = task.copy(
+                status = TaskStatus.RUNNING,
+                totalSteps = plan.actions.size,
+                currentStep = startIndex,
+                updatedAt = clock(),
+                lastError = null,
+                checkpointJson = checkpointJson(runId, startIndex)
+            )
+            taskRepository?.checkpoint(resumed, null)
+
+            if (startIndex >= plan.actions.size) {
+                update(runId, AgentStatus.COMPLETED, "Persisted task was already at its final checkpoint")
+                taskRepository?.markCompleted(task.id, clock())
+                OrchestratorResult.Completed(runId, "Task resumed and completed from checkpoint")
+            } else {
+                executePlan(plan, resumed, startIndex)
+            }
+        } catch (_: CancellationException) {
+            update(runId, AgentStatus.CANCELLED, "Resume cancelled")
+            taskRepository?.updateStatus(task.id, TaskStatus.CANCELLED.name, "Resume cancelled")
+            OrchestratorResult.Cancelled(runId)
+        } catch (t: Throwable) {
+            update(runId, AgentStatus.FAILED, "Resume failed")
+            _state.value = _state.value.copy(error = t.message)
+            taskRepository?.updateStatus(task.id, TaskStatus.FAILED.name, t.message ?: "Unknown error")
+            OrchestratorResult.Failed(runId, t.message ?: "Unknown error")
+        }
+    }
+
+    private suspend fun createPlan(goal: String, thinkingLevel: ThinkingLevel, runId: String): AgentPlan {
+        val relevantMemory = memoryRepository?.search(goal, limit = 8).orEmpty()
+        val planningGoal = MemoryRepositoryBridge.withContext(goal, relevantMemory)
+        update(runId, AgentStatus.PLANNING, "Creating execution plan")
+        return planner.createPlan(planningGoal, thinkingLevel).copy(runId = runId)
+    }
+
+    private fun createTask(goal: String, runId: String): TaskRecord {
+        val createdAt = clock()
+        return TaskRecord(
+            id = UUID.randomUUID().toString(),
+            title = goal.trim().take(80).ifBlank { "Vynnra task" },
+            goal = goal,
+            status = TaskStatus.PENDING,
+            currentStep = 0,
+            totalSteps = 0,
+            checkpointJson = checkpointJson(runId, 0),
+            lastError = null,
+            requiresUserAction = false,
+            createdAt = createdAt,
+            updatedAt = createdAt,
+            completedAt = null
+        )
+    }
+
+    private suspend fun executePlan(
+        plan: AgentPlan,
+        initialTask: TaskRecord,
+        startIndex: Int
+    ): OrchestratorResult {
         var task = initialTask
         for ((index, action) in plan.actions.withIndex()) {
+            if (index < startIndex) continue
             currentCoroutineContext().ensureActive()
             if (stopRequested) {
                 update(plan.runId, AgentStatus.CANCELLED, "Emergency stop requested")
@@ -122,7 +166,13 @@ class AgentOrchestrator(
                     update(plan.runId, AgentStatus.BLOCKED, "Missing capability: ${gate.missing.joinToString()}")
                     journal.record(plan.runId, action, "BLOCKED", "Missing capability")
                     taskRepository?.checkpoint(
-                        task.copy(status = TaskStatus.BLOCKED, currentStep = index, updatedAt = clock(), requiresUserAction = true),
+                        task.copy(
+                            status = TaskStatus.BLOCKED,
+                            currentStep = index,
+                            updatedAt = clock(),
+                            requiresUserAction = true,
+                            checkpointJson = checkpointJson(plan.runId, index)
+                        ),
                         TaskStepRecord(
                             taskId = task.id,
                             stepIndex = index,
@@ -151,7 +201,7 @@ class AgentOrchestrator(
                     status = TaskStatus.RUNNING,
                     currentStep = index,
                     updatedAt = clock(),
-                    checkpointJson = "{\"runId\":\"${plan.runId}\",\"actionIndex\":$index}"
+                    checkpointJson = checkpointJson(plan.runId, index)
                 )
                 val runningStep = TaskStepRecord(
                     taskId = task.id,
@@ -177,7 +227,12 @@ class AgentOrchestrator(
                     update(plan.runId, AgentStatus.CANCELLED, "Execution cancelled")
                     taskRepository?.checkpoint(
                         runningTask.copy(status = TaskStatus.CANCELLED, updatedAt = clock(), lastError = "Execution cancelled"),
-                        runningStep.copy(status = TaskStepStatus.CANCELLED, completedAt = clock(), attempts = attempt + 1, errorMessage = "Execution cancelled")
+                        runningStep.copy(
+                            status = TaskStepStatus.CANCELLED,
+                            completedAt = clock(),
+                            attempts = attempt + 1,
+                            errorMessage = "Execution cancelled"
+                        )
                     )
                     return OrchestratorResult.Cancelled(plan.runId)
                 }
@@ -217,7 +272,19 @@ class AgentOrchestrator(
                 update(plan.runId, AgentStatus.RECOVERING, "Recovering from $lastResult")
                 val decision = recovery.decide(action, result.status, attempt)
                 if (!decision.retry) {
-                    return failTask(task, plan.runId, decision.message)
+                    val failedAt = clock()
+                    task = runningTask.copy(status = TaskStatus.FAILED, updatedAt = failedAt, lastError = decision.message)
+                    taskRepository?.checkpoint(
+                        task,
+                        runningStep.copy(
+                            status = TaskStepStatus.FAILED,
+                            completedAt = failedAt,
+                            attempts = attempt + 1,
+                            errorMessage = decision.message,
+                            outputSummary = boundedSummary(result.message)
+                        )
+                    )
+                    return OrchestratorResult.Failed(plan.runId, decision.message)
                 }
                 attempt++
             }
@@ -243,8 +310,10 @@ class AgentOrchestrator(
         )
     }
 
-    private fun boundedSummary(message: String?): String? =
-        message?.take(2_000)
+    private fun checkpointJson(runId: String, actionIndex: Int): String =
+        "{\"runId\":\"$runId\",\"actionIndex\":$actionIndex}"
+
+    private fun boundedSummary(message: String?): String? = message?.take(2_000)
 }
 
 data class OrchestratorState(
