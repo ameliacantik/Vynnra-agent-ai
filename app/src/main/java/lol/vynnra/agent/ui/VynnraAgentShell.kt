@@ -1155,7 +1155,8 @@ private fun PermissionCenter(
     }
 }
 
-(label: String, onClick: () -> Unit, enabled: Boolean = true) {
+@Composable
+private fun PermissionButton(label: String, onClick: () -> Unit, enabled: Boolean = true) {
     OutlinedButton(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
         Text(label)
     }
