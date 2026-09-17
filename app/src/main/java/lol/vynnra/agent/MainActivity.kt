@@ -100,6 +100,7 @@ class MainActivity : ComponentActivity() {
                     onStartVoice = { voiceController.startListening() },
                     onStopVoice = { voiceController.stopListening() },
                     onStopSpeaking = { voiceController.stopSpeaking() },
+                    onStopAgent = { agentRuntime.orchestrator.requestStop() },
                     onSendMessage = { text, thinkingLevel, speakResponse ->
                         submitAgentRequest(text, thinkingLevel, speakResponse)
                     },
