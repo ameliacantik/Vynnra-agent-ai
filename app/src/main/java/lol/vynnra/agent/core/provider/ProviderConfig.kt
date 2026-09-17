@@ -5,8 +5,17 @@ data class ProviderConfig(
     val apiKey: String,
     val model: String
 ) {
-    fun isConfigured(): Boolean =
-        baseUrl.trim().isNotEmpty() && apiKey.trim().isNotEmpty() && model.trim().isNotEmpty()
+    fun hasEndpoint(): Boolean = normalizedBaseUrl().isNotEmpty()
 
-    fun normalizedBaseUrl(): String = baseUrl.trim().trimEnd('/')
+    fun isConfigured(): Boolean = hasEndpoint() && model.trim().isNotEmpty()
+
+    fun normalizedBaseUrl(): String {
+        var value = baseUrl.trim().trimEnd('/')
+        value = value.removeSuffix("/chat/completions").trimEnd('/')
+        value = value.removeSuffix("/models").trimEnd('/')
+        return value
+    }
+
+    fun authorizationHeader(): String? =
+        apiKey.trim().takeIf { it.isNotEmpty() }?.let { "Bearer $it" }
 }
