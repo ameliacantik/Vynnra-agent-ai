@@ -2,9 +2,9 @@
 
 ## Implementation checklist
 
-- [~] Chrome automation foundation
+- [x] Chrome automation foundation
 - [ ] Chrome target navigation and extraction hardened with device runtime coverage
-- [ ] AI-native browser option
+- [~] AI-native browser option
 - [x] Capability-aware file agent
 - [x] File search/read/write/move/copy/delete primitives
 - [x] Protected Android path rejection
@@ -18,6 +18,10 @@
 Vynnra's initial Chrome controller uses Android intents for URL navigation and the existing Accessibility service for click, type, scroll, back, and page-text extraction. This keeps the implementation compatible with Chrome UI changes without assuming a private DOM interface.
 
 The controller falls back to the device default browser if Chrome is unavailable.
+
+## AI-native browser
+
+Vynnra now has a dedicated WebView browser activity with HTTP(S)-only navigation and a tool entry point. It is intentionally marked partial until real-device behavior, JavaScript-heavy sites, downloads, and upload/picker integration are tested.
 
 ## File contract
 
