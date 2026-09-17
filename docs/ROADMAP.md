@@ -1,5 +1,7 @@
 # Vynnra Agent AI Roadmap
 
+Status legend: `[x]` implemented and CI/build verified, `[~]` foundation/partial implementation, `[ ]` not implemented.
+
 ## Phase 0 — Architecture specification
 - [x] Define system layers
 - [x] Define agent lifecycle
@@ -36,38 +38,38 @@
 - [ ] Error/reconnect UX
 
 ## Phase 3 — Agent Orchestrator
-- [ ] Orchestrator
-- [ ] Tool registry
-- [ ] Planner/executor loop
-- [ ] Observe → Understand → Plan → Act → Verify → Recover → Respond
-- [ ] Verification engine
-- [ ] Recovery engine
-- [ ] Action journal
-- [ ] Cancellation / emergency stop
+- [x] Orchestrator
+- [x] Tool registry
+- [x] Planner/executor loop
+- [x] Observe → Understand → Plan → Act → Verify → Recover → Respond
+- [x] Verification engine
+- [x] Recovery engine
+- [x] Action journal
+- [x] Cancellation / emergency stop
 
 ## Phase 4 — Permission Center
-- [ ] Capability inventory
-- [ ] Accessibility permission flow
+- [x] Capability inventory
+- [x] Accessibility permission flow
 - [ ] Screen-capture consent flow
-- [ ] Storage/file capability flow
-- [ ] Storage access levels: Level 1 / Level 2 / Level 3
-- [ ] Level 1 — Standard / Scoped Storage: SAF + app-owned and user-selected files/directories
-- [ ] Level 2 — Full Storage: broad shared-storage access through the appropriate Android all-files capability where eligible
-- [ ] Level 3 — Power User: optional ADB / device-owner / elevated device-management integrations where supported
-- [ ] Explicit storage capability status: granted / partial / denied / not supported
+- [x] Storage/file capability flow
+- [x] Storage access levels: Level 1 / Level 2 / Level 3
+- [x] Level 1 — Standard / Scoped Storage: SAF + app-owned and user-selected files/directories
+- [x] Level 2 — Full Storage: broad shared-storage access through the appropriate Android all-files capability where eligible
+- [x] Level 3 — Power User: optional ADB / device-owner / elevated device-management integrations where supported
+- [x] Explicit storage capability status: granted / partial / denied / not supported
 - [ ] Notification access
-- [ ] Overlay permission
-- [ ] Microphone permission
+- [x] Overlay permission
+- [x] Microphone permission
 - [ ] Background execution capability
-- [ ] Permission status monitoring
+- [x] Permission status monitoring
 
 ## Phase 5 — Android Control
-- [ ] Accessibility service
+- [x] Accessibility service
 - [ ] Screen inspection
-- [ ] Gesture/input execution
-- [ ] App launching
-- [ ] Global navigation actions
-- [ ] Permission-aware device actions
+- [x] Gesture/input execution
+- [x] App launching
+- [x] Global navigation actions
+- [x] Permission-aware device actions
 
 ## Phase 6 — Vision
 - [ ] Screenshot pipeline
@@ -82,8 +84,8 @@
 - [ ] File agent
 - [ ] File search/read/write/move/copy/delete
 - [ ] Download/upload workflows
-- [ ] Storage-aware routing across Level 1 / Level 2 / Level 3
-- [ ] Safe handling of protected Android paths and unavailable system areas
+- [x] Storage-aware routing across Level 1 / Level 2 / Level 3
+- [x] Safe handling of protected Android paths and unavailable system areas
 - [ ] Bulk file operations with confirmation gates
 
 ## Phase 8 — Tavily Web Search
@@ -148,6 +150,19 @@ An optional advanced mode for specially configured devices.
 - Root access is not assumed; a rooted/custom-ROM environment is required for genuinely root-only operations
 
 The UI must always display the active storage level and the exact capability status instead of presenting access as universally unrestricted.
+
+## Build Verification
+
+Latest verified CI run for the current Android control implementation:
+- Workflow run: `35184927438`
+- Build job: `105084828273`
+- Result: **success**
+- Debug APK artifact: `vynnra-agent-debug-apk`
+- Artifact ID: `10481289826`
+- Artifact size: ~16.9 MB
+- Artifact SHA-256: `236ad088bd30498dc02ae5712e5d9641ab67674633f2c87170d70e4480c2ff52`
+
+CI success verifies that the project compiles and the debug APK is produced. It does not replace real-device runtime verification.
 
 ## Vynnra Agent 1.0
 
