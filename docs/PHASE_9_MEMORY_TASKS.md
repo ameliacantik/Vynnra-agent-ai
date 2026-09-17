@@ -14,23 +14,27 @@
 - [x] Resumable-task discovery after process/app restart
 - [x] Application-scoped database/repository wiring
 - [x] Unit coverage for memory relevance and task checkpoint/resume behavior
-- [ ] Chat UI memory controls
-- [ ] Task UI and task detail timeline
-- [ ] Full agent-orchestrator integration for automatic task checkpointing
-- [ ] End-to-end device restart verification
+- [x] Chat UI memory controls
+- [x] Task UI and task detail timeline
+- [x] Full agent-orchestrator integration for automatic task checkpointing
+- [~] End-to-end device restart verification
 
 ## Memory contract
 
 Vynnra separates recent conversation context from long-term memory. Recent chat messages are bounded per request. Long-term memories are explicit records that can be enabled/disabled, pinned, or permanently forgotten by the user. Sensitive metadata is stored with the record so future policy layers can restrict how it is surfaced.
 
-Memory retrieval is intentionally bounded. A SQL candidate query is followed by a deterministic relevance score using token overlap, importance, freshness, and pinning. This phase does not persist or expose hidden chain-of-thought.
+Memory retrieval is intentionally bounded. A SQL candidate query is followed by a deterministic relevance score using token overlap, importance, freshness, and pinning. The planning layer injects only a bounded set of relevant enabled memories. This phase does not persist or expose hidden chain-of-thought.
 
 ## Task contract
 
 Tasks are durable state machines. Each task stores its goal, lifecycle status, current step, checkpoint payload, error state, and optional user-action requirement. Individual steps store their status, tool identifier, input/output summaries, attempt count, and timestamps.
 
-The repository exposes resumable tasks after process restart. Automatic background execution is intentionally deferred to Phase 11; Phase 9 persists enough state for a future runner to safely resume from a verified checkpoint.
+The orchestrator creates and checkpoints tasks around tool execution, records verified step completion, persists blocked/cancelled/failed states, and exposes resumable-task discovery. Resume starts from the persisted current step rather than replaying already verified steps. Automatic background execution remains deferred to Phase 11.
+
+## UI contract
+
+The Memory & Tasks center is exposed from the main Vynnra sidebar. Memory controls cover add, enable/disable, pin/unpin, and forget. Task controls expose persisted task status, progress, checkpoint payload, and step-level execution history.
 
 ## Verification boundary
 
-CI must compile the Android project and execute the Phase 9 unit tests. Device-level restart testing and UI verification remain runtime work before every Phase 9 item can move to `[x]`.
+The Android build and JVM unit-test stages pass on the latest Phase 9 CI run. The Android emulator restart stage did not complete within the hosted runner timeout because the emulator/ADB environment was slow to become usable; no application assertion failure was reported. Therefore the restart verification remains `[~]` until it passes on a reliable emulator/device environment.
