@@ -106,7 +106,7 @@ class FileAgent(context: Context) {
     fun delete(path: String): FileOperationResult {
         val target = resolveAccessible(path, write = true) ?: return blocked(path)
         if (!target.exists()) return failed("Path does not exist")
-        if (target == target.parentFile?.root || target.path == "/") return failed("Refusing to delete filesystem root")
+        if (target.parentFile == null || target.path == "/") return failed("Refusing to delete filesystem root")
         return if (target.deleteRecursively()) {
             success("Deleted", mapOf("path" to target.path))
         } else {
