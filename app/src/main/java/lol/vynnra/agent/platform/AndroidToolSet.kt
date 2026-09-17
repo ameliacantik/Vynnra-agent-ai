@@ -18,22 +18,22 @@ private fun AndroidControlResult.toToolResult(): ToolResult = ToolResult(
 )
 
 class AndroidBackTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition("android.back", "Android Back", "Press the Android Back action.")
+    override val definition = toolDefinition("android.back", "Android Back", "Press the Android Back action.", riskLevel = RiskLevel.LOW)
     override suspend fun execute(input: Unit): ToolResult = controller.back().toToolResult()
 }
 
 class AndroidHomeTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition("android.home", "Android Home", "Go to the Android Home screen.")
+    override val definition = toolDefinition("android.home", "Android Home", "Go to the Android Home screen.", riskLevel = RiskLevel.LOW)
     override suspend fun execute(input: Unit): ToolResult = controller.home().toToolResult()
 }
 
 class AndroidRecentsTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition("android.recents", "Android Recents", "Open the Android recent-apps screen.")
+    override val definition = toolDefinition("android.recents", "Android Recents", "Open the Android recent-apps screen.", riskLevel = RiskLevel.LOW)
     override suspend fun execute(input: Unit): ToolResult = controller.recents().toToolResult()
 }
 
 class AndroidNotificationsTool(private val controller: AndroidController) : VynnraTool<Unit> {
-    override val definition = toolDefinition("android.notifications", "Android Notifications", "Open the Android notification shade.")
+    override val definition = toolDefinition("android.notifications", "Android Notifications", "Open the Android notification shade.", riskLevel = RiskLevel.LOW)
     override suspend fun execute(input: Unit): ToolResult = controller.notifications().toToolResult()
 }
 
@@ -127,7 +127,7 @@ class AndroidFindTextTool(private val controller: AndroidController) : VynnraToo
         supportsVerification = true
     )
     override suspend fun execute(input: FindTextInput): ToolResult {
-        val matches = controller.findText(input.text)
+        val matches = controller.findText(input.text, input.ignoreCase)
         return ToolResult(
             status = if (matches.isNotEmpty()) ToolResultStatus.SUCCESS else ToolResultStatus.FAILED,
             message = if (matches.isNotEmpty()) "Found ${matches.size} matching element(s)" else "Text not found: ${input.text}",
