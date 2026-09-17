@@ -5,6 +5,7 @@ import lol.vynnra.agent.core.memory.MemoryRecord
 
 interface MemoryRepository {
     fun observeEnabled(): Flow<List<MemoryRecord>>
+    fun observeAll(): Flow<List<MemoryRecord>>
     suspend fun upsert(memory: MemoryRecord)
     suspend fun search(query: String, limit: Int = 20): List<MemoryRecord>
     suspend fun get(id: String): MemoryRecord?
