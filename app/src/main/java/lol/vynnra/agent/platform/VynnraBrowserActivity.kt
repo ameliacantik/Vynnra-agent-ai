@@ -1,6 +1,7 @@
 package lol.vynnra.agent.platform
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
@@ -56,8 +57,9 @@ class VynnraBrowserActivity : Activity() {
     companion object {
         private const val EXTRA_URL = "url"
 
-        fun intent(activity: Activity, url: String? = null): Intent =
-            Intent(activity, VynnraBrowserActivity::class.java).apply {
+        fun intent(context: Context, url: String? = null): Intent =
+            Intent(context, VynnraBrowserActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 url?.let { putExtra(EXTRA_URL, it) }
             }
     }
