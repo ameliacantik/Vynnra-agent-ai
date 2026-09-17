@@ -13,8 +13,7 @@ class BrowserOpenTool(private val browser: BrowserController) : VynnraTool<Brows
         requiredCapabilities = setOf(Capability.BROWSER_CONTROL), riskLevel = RiskLevel.LOW,
         supportsVerification = true
     )
-    override suspend fun execute(input: BrowserOpenInput): ToolResult = browser.browserResult()
-    private fun BrowserController.browserResult(): ToolResult = BrowserActionResultAdapter.current
+    override suspend fun execute(input: BrowserOpenInput): ToolResult = browser.openUrl(input.url).toToolResult()
 }
 
 data class BrowserOpenInput(val url: String)
@@ -79,7 +78,7 @@ class BrowserExtractTool(private val browser: BrowserController) : VynnraTool<Br
     )
     override suspend fun execute(input: BrowserExtractInput): ToolResult = ToolResult(
         status = ToolResultStatus.SUCCESS,
-        data = mapOf("texts" to browser.extractText(input.maxItems)),
+        data = mapOf("texts" to browser.extractText(input.maxItems.coerceIn(1, 500))),
         message = "Browser text extracted"
     )
 }
@@ -90,7 +89,7 @@ class BrowserDownloadTool(private val browser: BrowserController) : VynnraTool<B
     override val definition = ToolDefinition(
         id = "browser.download", name = "Download URL", description = "Queue a URL download into the Android Downloads directory.",
         requiredCapabilities = setOf(Capability.BROWSER_CONTROL, Capability.FILE_WRITE), riskLevel = RiskLevel.MEDIUM,
-        requiresConfirmation = false, supportsVerification = true
+        requiresConfirmation = true, supportsVerification = true
     )
     override suspend fun execute(input: BrowserDownloadInput): ToolResult = browser.download(input.url, input.fileName).toToolResult()
 }
@@ -104,11 +103,6 @@ class BrowserUploadTool(private val browser: BrowserController) : VynnraTool<Uni
         requiresConfirmation = true
     )
     override suspend fun execute(input: Unit): ToolResult = browser.openUploadPicker().toToolResult()
-}
-
-private object BrowserActionResultAdapter {
-    val current: ToolResult
-        get() = ToolResult(ToolResultStatus.FAILED, message = "Invalid browser tool invocation")
 }
 
 private fun BrowserActionResult.toToolResult(): ToolResult = ToolResult(
