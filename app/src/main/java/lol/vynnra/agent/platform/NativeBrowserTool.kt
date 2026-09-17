@@ -19,7 +19,7 @@ class NativeBrowserOpenTool(private val context: Context) : VynnraTool<NativeBro
     )
 
     override suspend fun execute(input: NativeBrowserOpenInput): ToolResult = try {
-        context.startActivity(VynnraBrowserActivity.intent(context as? android.app.Activity ?: throw IllegalStateException("Activity context required"), input.url))
+        context.startActivity(VynnraBrowserActivity.intent(context, input.url))
         ToolResult(ToolResultStatus.SUCCESS, data = mapOf("url" to input.url), message = "Vynnra Browser opened")
     } catch (error: Exception) {
         ToolResult(ToolResultStatus.FAILED, message = "Unable to open Vynnra Browser: ${error.message ?: "unknown error"}")
