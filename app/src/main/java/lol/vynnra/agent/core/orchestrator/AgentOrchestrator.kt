@@ -34,11 +34,16 @@ class AgentOrchestrator(
     private val _state = MutableStateFlow(OrchestratorState())
     val state: StateFlow<OrchestratorState> = _state.asStateFlow()
 
+    private val _activity = MutableStateFlow<List<AgentActivityEvent>>(emptyList())
+    /** High-level execution telemetry only: never hidden chain-of-thought. */
+    val activity: StateFlow<List<AgentActivityEvent>> = _activity.asStateFlow()
+
     @Volatile
     private var stopRequested = false
 
     suspend fun run(goal: String, thinkingLevel: ThinkingLevel = ThinkingLevel.MAX): OrchestratorResult {
         stopRequested = false
+        _activity.value = emptyList()
         val runId = UUID.randomUUID().toString()
         var task = createTask(goal, runId)
         taskRepository?.create(task)
@@ -310,6 +315,13 @@ class AgentOrchestrator(
             currentActivity = activity,
             error = null
         )
+        val entry = AgentActivityEvent(
+            runId = runId,
+            status = status,
+            title = activity,
+            timestamp = clock()
+        )
+        _activity.value = (_activity.value + entry).takeLast(32)
     }
 
     private fun checkpointJson(runId: String, actionIndex: Int): String =
@@ -317,6 +329,13 @@ class AgentOrchestrator(
 
     private fun boundedSummary(message: String?): String? = message?.take(2_000)
 }
+
+data class AgentActivityEvent(
+    val runId: String,
+    val status: AgentStatus,
+    val title: String,
+    val timestamp: Long
+)
 
 data class OrchestratorState(
     val runId: String? = null,
