@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import lol.vynnra.agent.core.orchestrator.AgentActivityEvent
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import lol.vynnra.agent.core.agent.ThinkingLevel
@@ -115,6 +116,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             VynnraTheme {
                 val voiceState by voiceController.state.collectAsStateWithLifecycle()
+                val orchestratorState by agentRuntime.orchestrator.state.collectAsStateWithLifecycle()
+                val agentActivity by agentRuntime.orchestrator.activity.collectAsStateWithLifecycle()
                 VynnraAgentShell(
                     memoryRepository = app.memoryRepository,
                     taskRepository = app.taskRepository,
@@ -157,6 +160,8 @@ class MainActivity : ComponentActivity() {
                     },
                     voiceState = voiceState,
                     voiceAgentState = voiceAgentState,
+                    orchestratorState = orchestratorState,
+                    agentActivity = agentActivity,
                     recordingState = audioRecorderState,
                     recordings = recordings,
                     providerConfig = providerConfig,
@@ -285,39 +290,50 @@ class MainActivity : ComponentActivity() {
 
         agentJob?.cancel()
         agentJob = lifecycleScope.launch {
-            voiceAgentState = VoiceAgentUiState(busy = true, activity = "Thinking…")
-            when (val result = agentRuntime.chatSession.submit(normalized, thinkingLevel)) {
-                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Success -> {
-                    voiceAgentState = voiceAgentState.copy(
-                        busy = false,
-                        activity = if (result.usedTools) "Agent completed verified actions" else "Response ready",
-                        replyId = System.nanoTime(),
-                        reply = result.text,
-                        error = null
-                    )
-                    if (speakResponse) voiceController.speak(result.text)
+            voiceAgentState = VoiceAgentUiState(busy = true, activity = "Starting Vynnra…")
+            try {
+                when (val result = agentRuntime.chatSession.submit(normalized, thinkingLevel)) {
+                    is lol.vynnra.agent.core.orchestrator.AgentChatResult.Success -> {
+                        voiceAgentState = voiceAgentState.copy(
+                            busy = false,
+                            activity = if (result.usedTools) "Verified actions completed" else "Response ready",
+                            replyId = System.nanoTime(),
+                            reply = result.text,
+                            error = null
+                        )
+                        if (speakResponse) runCatching { voiceController.speak(result.text) }
+                    }
+                    is lol.vynnra.agent.core.orchestrator.AgentChatResult.Blocked -> {
+                        voiceAgentState = voiceAgentState.copy(
+                            busy = false,
+                            activity = "Waiting for permission",
+                            error = result.message
+                        )
+                    }
+                    is lol.vynnra.agent.core.orchestrator.AgentChatResult.Failed -> {
+                        voiceAgentState = voiceAgentState.copy(
+                            busy = false,
+                            activity = "Agent failed",
+                            error = result.message
+                        )
+                    }
+                    is lol.vynnra.agent.core.orchestrator.AgentChatResult.Cancelled -> {
+                        voiceAgentState = voiceAgentState.copy(
+                            busy = false,
+                            activity = "Agent stopped",
+                            error = null
+                        )
+                    }
                 }
-                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Blocked -> {
-                    voiceAgentState = voiceAgentState.copy(
-                        busy = false,
-                        activity = "Waiting for capability",
-                        error = result.message
-                    )
-                }
-                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Failed -> {
-                    voiceAgentState = voiceAgentState.copy(
-                        busy = false,
-                        activity = "Agent failed",
-                        error = result.message
-                    )
-                }
-                is lol.vynnra.agent.core.orchestrator.AgentChatResult.Cancelled -> {
-                    voiceAgentState = voiceAgentState.copy(
-                        busy = false,
-                        activity = "Agent cancelled",
-                        error = null
-                    )
-                }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                voiceAgentState = voiceAgentState.copy(busy = false, activity = "Agent stopped")
+                throw cancelled
+            } catch (error: Throwable) {
+                voiceAgentState = voiceAgentState.copy(
+                    busy = false,
+                    activity = "Agent error",
+                    error = error.message ?: "Unexpected agent error"
+                )
             }
         }.also { job ->
             job.invokeOnCompletion { if (agentJob === job) agentJob = null }
