@@ -34,7 +34,7 @@ import lol.vynnra.agent.platform.ScreenCaptureConsentController
 import lol.vynnra.agent.platform.ScreenCaptureController
 import lol.vynnra.agent.platform.VoiceController
 import lol.vynnra.agent.platform.VoiceStatus
-import lol.vynnra.agent.ui.VynnraAgentShell
+import lol.vynnra.agent.ui.VynnraAgentShellV2
 import lol.vynnra.agent.ui.theme.VynnraTheme
 
 class MainActivity : ComponentActivity() {
@@ -118,7 +118,7 @@ class MainActivity : ComponentActivity() {
                 val voiceState by voiceController.state.collectAsStateWithLifecycle()
                 val orchestratorState by agentRuntime.orchestrator.state.collectAsStateWithLifecycle()
                 val agentActivity by agentRuntime.orchestrator.activity.collectAsStateWithLifecycle()
-                VynnraAgentShell(
+                VynnraAgentShellV2(
                     memoryRepository = app.memoryRepository,
                     taskRepository = app.taskRepository,
                     screenCaptureGranted = screenCaptureGranted,
