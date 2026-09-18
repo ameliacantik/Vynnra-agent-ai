@@ -378,7 +378,7 @@ fun VynnraAgentShellV2(
         )
     }
 
-    if (memoryTasksOpen) Phase9Center(memoryRepository, taskRepository) { memoryTasksOpen = false }
+    if (memoryTasksOpen) V2MemoryTasksPanel { memoryTasksOpen = false }
 
     if (recordingsOpen) {
         V2RecordingsPanel(
@@ -1045,6 +1045,38 @@ private fun PermissionRowV2(title: String, granted: Boolean, detail: String, onA
                 Text(detail, color = VynnraMuted)
             }
             Text(if (granted) "ON" else "OPEN", color = if (granted) VynnraPurpleSoft else VynnraMuted, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun V2MemoryTasksPanel(onClose: () -> Unit) {
+    V2Modal {
+        Column(Modifier.fillMaxSize().padding(18.dp)) {
+            V2PanelHeader("Memory & Tasks", Icons.Outlined.Memory, onClose)
+            Text(
+                "Vynnra keeps durable memory and task checkpoints through the app repositories.",
+                color = VynnraMuted
+            )
+            Spacer(Modifier.height(14.dp))
+            V2SettingsSection("Persistent workspace", "The runtime is already wired to memory and task repositories") {
+                SettingLineV2("Memory", "Connected to agent runtime", Icons.Outlined.Memory)
+                SettingLineV2("Tasks", "Checkpoint + resume enabled", Icons.Outlined.Bolt)
+                SettingLineV2("Recovery", "Bounded retries + verification", Icons.Outlined.Security)
+            }
+            Spacer(Modifier.height(12.dp))
+            V2SettingsSection("Current architecture", "Agent execution remains observable without exposing private reasoning") {
+                Text(
+                    "OBSERVE → UNDERSTAND → PLAN → ACT → VERIFY → RECOVER → RESPOND",
+                    color = VynnraPurpleSoft,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "High-level action telemetry is shown in chat. Hidden chain-of-thought is never surfaced.",
+                    color = VynnraMuted
+                )
+            }
         }
     }
 }
